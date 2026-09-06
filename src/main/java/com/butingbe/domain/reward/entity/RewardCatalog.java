@@ -1,6 +1,7 @@
 package com.butingbe.domain.reward.entity;
 
 import com.butingbe.global.common.BaseEntity;
+import com.butingbe.global.error.exception.ConflictException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -89,6 +90,36 @@ public class RewardCatalog extends BaseEntity {
     }
     if (active != null) {
       this.active = active;
+    }
+  }
+
+  /** 재고를 1 차감한다. */
+  public void decreaseStock() {
+    decreaseStock(1);
+  }
+
+  /** 재고를 지정 수량만큼 차감한다. */
+  public void decreaseStock(int quantity) {
+    if (quantity <= 0) {
+      return;
+    }
+    if (this.stock != null) {
+      if (this.stock < quantity) {
+        throw new ConflictException("error.reward.out_of_stock");
+      }
+      this.stock = this.stock - quantity;
+    }
+  }
+
+  /** 재고를 1 증가시킨다. */
+  public void increaseStock() {
+    increaseStock(1);
+  }
+
+  /** 재고를 지정 수량만큼 증가시킨다. */
+  public void increaseStock(int quantity) {
+    if (this.stock != null && quantity > 0) {
+      this.stock = this.stock + quantity;
     }
   }
 }

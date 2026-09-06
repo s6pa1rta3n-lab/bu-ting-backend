@@ -89,4 +89,32 @@ public class AdminZoneEventController {
     return ResponseEntity.ok(
         ApiResponse.success("이벤트 취소", adminZoneEventService.cancel(user, eventId)));
   }
+
+  @PostMapping("/{eventId}/settle")
+  public ResponseEntity<
+          ApiResponse<com.butingbe.domain.reward.dto.response.TopLikeSettlementReportResDto>>
+      settle(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID eventId) {
+    return ResponseEntity.ok(
+        ApiResponse.success("우수 보상 정산 완료", adminZoneEventService.settleEvent(user, eventId)));
+  }
+
+  @PostMapping("/rounds/{roundId}/settle")
+  public ResponseEntity<
+          ApiResponse<
+              java.util.List<
+                  com.butingbe.domain.reward.dto.response.TopLikeSettlementReportResDto>>>
+      settleRound(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID roundId) {
+    return ResponseEntity.ok(
+        ApiResponse.success("회차 우수 보상 정산 완료", adminZoneEventService.settleRound(user, roundId)));
+  }
+
+  @PostMapping("/participations/{participationId}/revoke")
+  public ResponseEntity<
+          ApiResponse<com.butingbe.domain.reward.dto.response.ParticipationRevokeResDto>>
+      revokeParticipation(
+          @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID participationId) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            "참여 무효화 및 보상 회수 완료", adminZoneEventService.revokeParticipation(user, participationId)));
+  }
 }
