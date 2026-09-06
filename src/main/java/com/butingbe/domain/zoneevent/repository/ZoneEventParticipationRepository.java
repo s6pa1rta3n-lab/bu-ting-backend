@@ -38,4 +38,39 @@ public interface ZoneEventParticipationRepository
       @org.springframework.data.repository.query.Param("visibility")
           com.butingbe.domain.zoneevent.entity.ParticipationVisibility visibility,
       org.springframework.data.domain.Pageable pageable);
+
+  long countByUserIdAndEvent_ZoneIdAndStatus(
+      UUID userId, String zoneId, ParticipationStatus status);
+
+  long countByUserIdAndStatus(UUID userId, ParticipationStatus status);
+
+  @org.springframework.data.jpa.repository.Query(
+      "SELECT DISTINCT p.event.zoneId FROM ZoneEventParticipation p WHERE p.userId = :userId AND p.status = :status")
+  List<String> findDistinctZoneIdsByUserIdAndStatus(
+      @org.springframework.data.repository.query.Param("userId") UUID userId,
+      @org.springframework.data.repository.query.Param("status") ParticipationStatus status);
+
+  org.springframework.data.domain.Page<ZoneEventParticipation>
+      findByEvent_IdAndStatusAndVisibilityAndHiddenFalse(
+          UUID eventId,
+          ParticipationStatus status,
+          com.butingbe.domain.zoneevent.entity.ParticipationVisibility visibility,
+          org.springframework.data.domain.Pageable pageable);
+
+  org.springframework.data.domain.Page<ZoneEventParticipation>
+      findByEvent_ZoneIdAndStatusAndVisibilityAndHiddenFalse(
+          String zoneId,
+          ParticipationStatus status,
+          com.butingbe.domain.zoneevent.entity.ParticipationVisibility visibility,
+          org.springframework.data.domain.Pageable pageable);
+
+  org.springframework.data.domain.Page<ZoneEventParticipation>
+      findByEvent_RoundIdAndStatusAndVisibilityAndHiddenFalse(
+          UUID roundId,
+          ParticipationStatus status,
+          com.butingbe.domain.zoneevent.entity.ParticipationVisibility visibility,
+          org.springframework.data.domain.Pageable pageable);
+
+  org.springframework.data.domain.Page<ZoneEventParticipation> findByStatusOrHiddenTrue(
+      ParticipationStatus status, org.springframework.data.domain.Pageable pageable);
 }

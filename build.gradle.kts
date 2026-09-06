@@ -92,6 +92,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
+    implementation("com.google.firebase:firebase-admin:9.4.3")
 
     // 👇 [미래 확장] 주석 해제하여 사용할 라이브러리 구역
     // 1. 데이터베이스 및 ORM (JPA) 라이브러리 추가

@@ -23,6 +23,7 @@ import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +46,7 @@ public class ZoneEventSubmitService {
   private final FileMetadataRepository fileMetadataRepository;
   private final RewardService rewardService;
   private final UserPointService userPointService;
+  private final ZoneTitleService zoneTitleService;
 
   @Value("${zone-event.review.mode:AUTO}")
   private String reviewMode;
@@ -96,7 +98,9 @@ public class ZoneEventSubmitService {
         request.longitude(),
         request.capturedAt());
 
-    if (isAutoApprove()) {
+    boolean isAnomalous = isAnomalousCapture(request.capturedAt(), event);
+
+    if (isAutoApprove() && !isAnomalous) {
       participation.markSuccess();
       RewardSnapshot base = event.getBaseReward();
       BaseRewardResult reward =
@@ -106,8 +110,14 @@ public class ZoneEventSubmitService {
               eventId,
               base == null ? null : base.points(),
               base == null ? null : base.badgeCode());
-      return SubmitResultResDto.of(
-          ParticipationResDto.of(participation, null), reward.rewards(), reward.pointBalance());
+      var newlyEarnedTitles = zoneTitleService.evaluateAndAwardTitles(userId, event.getZoneId());
+      var titleSummary = zoneTitleService.getUserTitlesSummary(userId);
+      return new SubmitResultResDto(
+          ParticipationResDto.of(participation, null),
+          reward.rewards(),
+          reward.pointBalance(),
+          new ArrayList<>(newlyEarnedTitles),
+          titleSummary);
     }
 
     participation.markUnderReview();
@@ -115,6 +125,24 @@ public class ZoneEventSubmitService {
         ParticipationResDto.of(participation, null),
         List.of(),
         userPointService.getBalance(userId));
+  }
+
+  private boolean isAnomalousCapture(java.time.OffsetDateTime capturedAt, ZoneEvent event) {
+    if (capturedAt == null) {
+      return false;
+    }
+    java.time.OffsetDateTime now = java.time.OffsetDateTime.now();
+    if (capturedAt.isAfter(now.plusMinutes(1))) {
+      return true;
+    }
+    long diffMinutes = Math.abs(java.time.Duration.between(capturedAt, now).toMinutes());
+    if (diffMinutes > 15) {
+      return true;
+    }
+    if (event.getStartsAt() != null && capturedAt.isBefore(event.getStartsAt().minusMinutes(5))) {
+      return true;
+    }
+    return false;
   }
 
   /** fileKey가 등록된 이미지인지 확인한다. 업로더 검증은 FileMetadata가 업로더를 저장하지 않아 보류한다. */

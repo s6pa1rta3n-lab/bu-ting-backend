@@ -8,4 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface ZoneEventRoundSlotRepository extends JpaRepository<ZoneEventRoundSlot, UUID> {
 
   List<ZoneEventRoundSlot> findByRound_Id(UUID roundId);
+
+  java.util.Optional<ZoneEventRoundSlot> findByRound_IdAndZoneId(UUID roundId, String zoneId);
+
+  List<ZoneEventRoundSlot> findByZoneId(String zoneId);
 }

@@ -160,6 +160,68 @@ public class ZoneEventParticipation extends TimestampEntity {
     this.status = ParticipationStatus.REVOKED;
   }
 
+  /** 검수자에 의해 참여를 회수(REVOKED) 상태로 변경한다. */
+  public void revoke(UUID reviewerId) {
+    this.status = ParticipationStatus.REVOKED;
+    this.reviewedBy = reviewerId;
+    this.reviewedAt = OffsetDateTime.now();
+  }
+
+  /** 검수 대기 중인 참여를 승인하여 성공 처리한다. */
+  public void approveReview(UUID reviewerId) {
+    this.status = ParticipationStatus.SUCCESS;
+    this.success = true;
+    this.completedAt = OffsetDateTime.now();
+    this.reviewedBy = reviewerId;
+    this.reviewedAt = OffsetDateTime.now();
+  }
+
+  /** 검수 대기 중인 참여를 반려한다. */
+  public void rejectReview(String failReason, UUID reviewerId) {
+    this.status = ParticipationStatus.FAIL;
+    this.success = false;
+    this.failReason = failReason;
+    this.reviewedBy = reviewerId;
+    this.reviewedAt = OffsetDateTime.now();
+  }
+
+  /** 참여 공개 범위를 변경한다. */
+  public void changeVisibility(ParticipationVisibility visibility) {
+    this.visibility = visibility;
+  }
+
+  /** 좋아요 수를 1 증가시킨다. */
+  public void incrementLikeCount() {
+    this.likeCount = (this.likeCount == null ? 0L : this.likeCount) + 1L;
+  }
+
+  /** 좋아요 수를 1 감소시킨다. */
+  public void decrementLikeCount() {
+    long current = this.likeCount == null ? 0L : this.likeCount;
+    this.likeCount = Math.max(0L, current - 1L);
+  }
+
+  /** 댓글 수를 1 증가시킨다. */
+  public void incrementCommentCount() {
+    this.commentCount = (this.commentCount == null ? 0 : this.commentCount) + 1;
+  }
+
+  /** 댓글 수를 1 감소시킨다. */
+  public void decrementCommentCount() {
+    int current = this.commentCount == null ? 0 : this.commentCount;
+    this.commentCount = Math.max(0, current - 1);
+  }
+
+  /** 참여 게시물을 숨김 처리한다. */
+  public void hide() {
+    this.hidden = true;
+  }
+
+  /** 참여 게시물 숨김을 해제한다. */
+  public void unhide() {
+    this.hidden = false;
+  }
+
   /** 반경 검증을 통과한 참여를 JOINED 상태로 시작한다. */
   public static ZoneEventParticipation join(
       ZoneEvent event, UUID userId, double gpsLat, double gpsLng) {
