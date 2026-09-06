@@ -120,4 +120,108 @@ public class ZoneEventParticipation extends TimestampEntity {
     this.likeCount = 0L;
     this.commentCount = 0;
   }
+
+  /** 인증 미디어와 촬영 좌표를 제출한다. 상태는 SUBMITTED로 옮긴다. */
+  public void submit(
+      String mediaFileKey,
+      String content,
+      double submitGpsLat,
+      double submitGpsLng,
+      OffsetDateTime capturedAt) {
+    this.mediaFileKey = mediaFileKey;
+    this.content = content;
+    this.submitGpsLat = submitGpsLat;
+    this.submitGpsLng = submitGpsLng;
+    this.capturedAt = capturedAt;
+    this.status = ParticipationStatus.SUBMITTED;
+  }
+
+  /** 자동 판정 통과. SUCCESS로 확정한다. */
+  public void markSuccess() {
+    this.status = ParticipationStatus.SUCCESS;
+    this.success = true;
+    this.completedAt = OffsetDateTime.now();
+  }
+
+  /** 검수 대기로 보낸다(MANUAL/HYBRID 또는 촬영 시각 이상). */
+  public void markUnderReview() {
+    this.status = ParticipationStatus.UNDER_REVIEW;
+  }
+
+  /** 열린 참여를 취소한다. */
+  public void cancel(String reason) {
+    this.status = ParticipationStatus.CANCELLED;
+    this.cancelReason = reason;
+  }
+
+  /** 운영자 검수 도장(승인·반려·회수 공통). */
+  public void stampReview(UUID reviewerId) {
+    this.reviewedBy = reviewerId;
+    this.reviewedAt = OffsetDateTime.now();
+  }
+
+  /** 검수 반려. */
+  public void markFail(String reason) {
+    this.status = ParticipationStatus.FAIL;
+    this.success = false;
+    this.failReason = reason;
+    this.completedAt = OffsetDateTime.now();
+  }
+
+  /** 어뷰징 회수. */
+  public void markRevoked() {
+    this.status = ParticipationStatus.REVOKED;
+    this.success = false;
+  }
+
+  /** 신고 자동 숨김을 해제한다. */
+  public void unhide() {
+    this.hidden = false;
+  }
+
+  /** 공개 범위를 바꾼다(PUBLIC↔PRIVATE). */
+  public void changeVisibility(ParticipationVisibility visibility) {
+    this.visibility = visibility;
+  }
+
+  public void increaseLikeCount() {
+    this.likeCount += 1;
+  }
+
+  public void decreaseLikeCount() {
+    this.likeCount = Math.max(0, this.likeCount - 1);
+  }
+
+  public void increaseCommentCount() {
+    this.commentCount += 1;
+  }
+
+  public void decreaseCommentCount() {
+    this.commentCount = Math.max(0, this.commentCount - 1);
+  }
+
+  /** 신고 누적 등으로 앨범에서 숨긴다. */
+  public void hide() {
+    this.hidden = true;
+  }
+
+  /** 앨범 상호작용(좋아요·댓글·신고) 대상인지: 공개·미숨김·성공. */
+  public boolean isInteractable() {
+    return status == ParticipationStatus.SUCCESS
+        && visibility == ParticipationVisibility.PUBLIC
+        && !Boolean.TRUE.equals(hidden);
+  }
+
+  /** 반경 검증을 통과한 참여를 JOINED 상태로 시작한다. */
+  public static ZoneEventParticipation join(
+      ZoneEvent event, UUID userId, double gpsLat, double gpsLng) {
+    return ZoneEventParticipation.builder()
+        .event(event)
+        .userId(userId)
+        .status(ParticipationStatus.JOINED)
+        .gpsLat(gpsLat)
+        .gpsLng(gpsLng)
+        .joinedAt(OffsetDateTime.now())
+        .build();
+  }
 }

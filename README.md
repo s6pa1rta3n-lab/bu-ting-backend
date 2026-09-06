@@ -34,6 +34,7 @@ src/main/java/com/butingbe
 │   ├── chat            # Regional chatrooms over STOMP/WebSocket
 │   ├── file            # S3 uploads and file metadata
 │   ├── place           # Place catalog backed by TourAPI and Google Places
+│   ├── reward          # Reward catalog, grants, point ledger and badges (Phase 1)
 │   ├── route           # Travel time, distance, visit-order and alternative routes
 │   ├── station         # Station reference data
 │   ├── storage         # Luggage storage locations
@@ -41,9 +42,11 @@ src/main/java/com/butingbe
 │   ├── travelexpense   # Expenses and settlements
 │   ├── travelrecord    # Travel records, reviews, likes, bookmarks, comments
 │   ├── travelsurvey    # Travel preference survey
+│   ├── notification    # Push: device tokens, subscriptions, settings (Phase 2)
 │   ├── travelteam      # Team members and invitations
 │   ├── user            # User profile
-│   └── zoneevent       # Zone events: on-site GPS authentication missions (Phase 1)
+│   ├── zonetitle       # Zone titles and city grade (Phase 2)
+│   └── zoneevent       # Zone events: on-site GPS missions, rounds and slots (Phase 1-2)
 └── global
     ├── common          # ApiResponse, BaseEntity, TimestampEntity
     ├── config          # AppConfig, SecurityConfig, WebConfig, WebSocketConfig, S3Config, I18nConfig
@@ -101,6 +104,20 @@ Request flow:
 | `/api/v1/travel/team`                        | `TravelTeamController`          | Team members, leader, invitations                  |
 | `/api/v1/chat/rooms`                         | `LocalChatroomController`       | Chatroom lookup, join, exit, message history       |
 | `/api/v1/files`                              | `FileController`                | Multipart upload to S3                             |
+| `/api/v1/zone-events`                        | `ZoneEventController`           | Active zone events and event detail (Phase 1)      |
+| `/api/v1/zone-events/{eventId}/participations` | `ZoneEventParticipationController` | Join, submit, cancel, and my participations for an event |
+| `/api/v1/zone-events/*/album`, `/zones/*/album`, `/zone-event-rounds/*/album` | `ZoneEventAlbumController`       | Public album feeds and participation visibility |
+| `/api/v1/zone-event-participations/{id}/likes`, `/comments`, `/reports` | `ZoneEventSocialController` | Likes, comments, and reports on public participations |
+| `/api/v1/admin/zone-event-participations`      | `AdminReviewController`         | Operator review queue: approve, reject, revoke, unhide |
+| `/api/v1/users/me/device-tokens`, `/zone-subscriptions`, `/notification-settings` | `UserNotificationController` | Push tokens, zone subscriptions, notification settings |
+| `/api/v1/admin/push`                          | `AdminPushController`           | Operator immediate push to a zone or everyone |
+| `/api/v1/zone-titles`, `/users/me/zone-titles`   | `ZoneTitleController`           | Zone title definitions, ownership, equip (Phase 2) |
+| `/api/v1/users/me/zone-event-participations` | `ZoneEventMeController`         | My zone event participation history (cursor paging) |
+| `/api/v1/users/me/rewards`, `/point-ledger`  | `UserRewardController`          | My reward summary (badges by zone, balance) and point ledger |
+| `/api/v1/admin/zone-events`                  | `AdminZoneEventController`      | Operator event CRUD and state transitions (ADMIN/MANAGER) |
+| `/api/v1/admin/reward-catalog`               | `AdminRewardCatalogController`  | Operator reward catalog CRUD and grant history (ADMIN/MANAGER) |
+| `/api/v1/admin/zone-event-rounds`            | `AdminRoundController`          | Operator round console: calendar, slots, backup/rain-swap targets, open/close/settle, settlement report (ADMIN/MANAGER) |
+| `/api/v1/zone-event-rounds/current`          | `ZoneEventRoundController`      | Current round status per zone (OPEN/REST/UPCOMING) |
 
 The generated OpenAPI specification lives at `src/main/resources/static/docs/openapi3.yaml`.
 
