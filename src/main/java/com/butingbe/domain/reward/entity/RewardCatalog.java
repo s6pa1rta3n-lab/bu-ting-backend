@@ -75,4 +75,27 @@ public class RewardCatalog extends BaseEntity {
     this.validDays = validDays;
     this.active = active == null ? Boolean.TRUE : active;
   }
+
+  /**
+   * 보상 카탈로그 정보를 수정한다.
+   *
+   * @param name 보상 이름
+   * @param stock 재고 수량
+   * @param monthlyCap 월별 지급 상한
+   * @param active 활성화 여부
+   */
+  public void update(String name, Integer stock, Integer monthlyCap, Boolean active) {
+    if (name != null) {
+      this.name = name;
+    }
+    if (stock != null) {
+      this.stock = stock;
+    }
+    if (monthlyCap != null) {
+      this.monthlyCap = monthlyCap;
+    }
+    if (active != null) {
+      this.active = active;
+    }
+  }
 }

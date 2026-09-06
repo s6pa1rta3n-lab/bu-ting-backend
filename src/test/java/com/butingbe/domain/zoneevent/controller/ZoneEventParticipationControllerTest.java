@@ -4,6 +4,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -236,6 +238,28 @@ class ZoneEventParticipationControllerTest {
                 .contentType("application/json")
                 .content("{\"latitude\":35.1532,\"longitude\":129.1182}"))
         .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @DisplayName("참여 취소는 200 OK를 반환한다")
+  void cancelReturns200() throws Exception {
+    mockMvc
+        .perform(
+            delete("/zone-events/{eventId}/participations/{participationId}", EVENT_ID, OPEN_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true));
+  }
+
+  @Test
+  @DisplayName("이벤트별 내 참여 목록 조회는 200 OK와 목록을 반환한다")
+  void getMyParticipationsForEventReturns200() throws Exception {
+    when(participationService.getMyParticipationsForEvent(any(), eq(EVENT_ID)))
+        .thenReturn(List.of());
+
+    mockMvc
+        .perform(get("/zone-events/{eventId}/participations/me", EVENT_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true));
   }
 
   private HandlerMethodArgumentResolver authenticatedUserResolver() {

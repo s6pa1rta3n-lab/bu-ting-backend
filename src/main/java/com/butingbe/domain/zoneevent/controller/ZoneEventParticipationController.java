@@ -14,6 +14,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -48,5 +50,23 @@ public class ZoneEventParticipationController {
       @RequestBody @Valid ParticipationSubmitReqDto request) {
     SubmitResultResDto result = submitService.submit(user, eventId, participationId, request);
     return ResponseEntity.ok(ApiResponse.success("인증 제출", result));
+  }
+
+  @DeleteMapping("/{participationId}")
+  public ResponseEntity<ApiResponse<Void>> cancel(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID eventId,
+      @PathVariable UUID participationId) {
+    participationService.cancel(user, eventId, participationId);
+    return ResponseEntity.ok(ApiResponse.success("이벤트 참여 취소", null));
+  }
+
+  @GetMapping("/me")
+  public ResponseEntity<ApiResponse<java.util.List<ParticipationResDto>>>
+      getMyParticipationsForEvent(
+          @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID eventId) {
+    java.util.List<ParticipationResDto> participations =
+        participationService.getMyParticipationsForEvent(user, eventId);
+    return ResponseEntity.ok(ApiResponse.success("내 참여 목록 조회", participations));
   }
 }

@@ -26,6 +26,21 @@ public record ParticipationResDto(
     List<Object> rewards) {
 
   public static ParticipationResDto of(ZoneEventParticipation participation, Integer distanceM) {
+    return of(participation, distanceM, null, List.of());
+  }
+
+  /**
+   * 참여 엔티티를 응답 DTO로 변환한다.
+   *
+   * @param participation 참여 엔티티
+   * @param distanceM 인증 타겟과의 거리(미터)
+   * @param mediaUrl 미디어 사전 서명 URL
+   * @param rewards 지급된 보상 목록
+   * @return 참여 응답 DTO
+   */
+  @SuppressWarnings("unchecked")
+  public static ParticipationResDto of(
+      ZoneEventParticipation participation, Integer distanceM, String mediaUrl, List<?> rewards) {
     return new ParticipationResDto(
         participation.getId().toString(),
         participation.getEvent().getId().toString(),
@@ -34,12 +49,12 @@ public record ParticipationResDto(
         participation.getStatus().name(),
         participation.getSuccess(),
         distanceM,
-        null,
+        mediaUrl,
         participation.getContent(),
         participation.getLikeCount(),
         participation.getVisibility().name(),
         participation.getJoinedAt(),
         participation.getCompletedAt(),
-        List.of());
+        rewards == null ? List.of() : (List<Object>) rewards);
   }
 }

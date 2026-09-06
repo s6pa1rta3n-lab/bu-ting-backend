@@ -13,6 +13,10 @@ public record GrantedRewardDto(
     String grantReason,
     OffsetDateTime grantedAt) {
 
+  public static GrantedRewardDto of(RewardGrant grant) {
+    return of(grant, grant.getReward().getPointAmount());
+  }
+
   public static GrantedRewardDto of(RewardGrant grant, Integer pointAmount) {
     return new GrantedRewardDto(
         grant.getId().toString(),

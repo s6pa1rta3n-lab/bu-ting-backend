@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
@@ -52,6 +53,8 @@ class ZoneEventParticipationServiceTest {
   @Mock private ZoneEventRepository zoneEventRepository;
   @Mock private ZoneEventAuthTargetRepository authTargetRepository;
   @Mock private ZoneEventParticipationRepository participationRepository;
+  @Mock private com.butingbe.domain.reward.repository.RewardGrantRepository rewardGrantRepository;
+  @Mock private com.butingbe.domain.file.service.FileStorageService fileStorageService;
 
   private ZoneEventParticipationService service;
   private AuthenticatedUser user;
@@ -61,7 +64,11 @@ class ZoneEventParticipationServiceTest {
   void setUp() {
     service =
         new ZoneEventParticipationService(
-            zoneEventRepository, authTargetRepository, participationRepository);
+            zoneEventRepository,
+            authTargetRepository,
+            participationRepository,
+            rewardGrantRepository,
+            fileStorageService);
     user = new AuthenticatedUser(USER_ID, "u@example.com", "u", List.of());
     event = event(ZoneEventStatus.ACTIVE, 1);
   }
@@ -232,5 +239,244 @@ class ZoneEventParticipationServiceTest {
         .longitude(129.118)
         .radiusM(100)
         .build();
+  }
+
+  @Test
+  @DisplayName("참여자가 본인의 진행 중 참여를 취소할 수 있다")
+  void cancelSuccess() {
+    ZoneEventParticipation p =
+        ZoneEventParticipation.builder()
+            .event(event)
+            .userId(USER_ID)
+            .gpsLat(35.153)
+            .gpsLng(129.118)
+            .joinedAt(OffsetDateTime.now())
+            .status(ParticipationStatus.JOINED)
+            .build();
+    ReflectionTestUtils.setField(p, "id", OPEN_ID);
+
+    when(participationRepository.findByIdAndEvent_Id(OPEN_ID, EVENT_ID)).thenReturn(Optional.of(p));
+
+    service.cancel(user, EVENT_ID, OPEN_ID);
+
+    assertThat(p.getStatus()).isEqualTo(ParticipationStatus.CANCELLED);
+    assertThat(p.getCancelReason()).isEqualTo("USER_CANCELLED");
+  }
+
+  @Test
+  @DisplayName("타인의 참여를 취소하려고 하면 403 Forbidden이다")
+  void cancelWhenNotOwner() {
+    UUID otherUser = UUID.randomUUID();
+    ZoneEventParticipation p =
+        ZoneEventParticipation.builder()
+            .event(event)
+            .userId(otherUser)
+            .gpsLat(35.153)
+            .gpsLng(129.118)
+            .joinedAt(OffsetDateTime.now())
+            .status(ParticipationStatus.JOINED)
+            .build();
+    ReflectionTestUtils.setField(p, "id", OPEN_ID);
+
+    when(participationRepository.findByIdAndEvent_Id(OPEN_ID, EVENT_ID)).thenReturn(Optional.of(p));
+
+    assertThatThrownBy(() -> service.cancel(user, EVENT_ID, OPEN_ID))
+        .isInstanceOf(com.butingbe.global.error.exception.ForbiddenException.class);
+  }
+
+  @Test
+  @DisplayName("이미 성공/실패 처리된 참여는 취소할 수 없다 (409 Conflict)")
+  void cancelWhenAlreadyEnded() {
+    ZoneEventParticipation p =
+        ZoneEventParticipation.builder()
+            .event(event)
+            .userId(USER_ID)
+            .gpsLat(35.153)
+            .gpsLng(129.118)
+            .joinedAt(OffsetDateTime.now())
+            .status(ParticipationStatus.SUCCESS)
+            .build();
+    ReflectionTestUtils.setField(p, "id", OPEN_ID);
+
+    when(participationRepository.findByIdAndEvent_Id(OPEN_ID, EVENT_ID)).thenReturn(Optional.of(p));
+
+    assertThatThrownBy(() -> service.cancel(user, EVENT_ID, OPEN_ID))
+        .isInstanceOf(ConflictException.class);
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 참여 취소 시 404이다")
+  void cancelWhenNotFound() {
+    when(participationRepository.findByIdAndEvent_Id(OPEN_ID, EVENT_ID))
+        .thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service.cancel(user, EVENT_ID, OPEN_ID))
+        .isInstanceOf(ResourceNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("특정 이벤트에 대한 내 참여 이력을 조회할 수 있다")
+  void getMyParticipationsForEvent() {
+    ZoneEventParticipation p =
+        ZoneEventParticipation.builder()
+            .event(event)
+            .userId(USER_ID)
+            .gpsLat(35.153)
+            .gpsLng(129.118)
+            .joinedAt(OffsetDateTime.now())
+            .status(ParticipationStatus.SUCCESS)
+            .build();
+    ReflectionTestUtils.setField(p, "id", OPEN_ID);
+    ReflectionTestUtils.setField(p, "mediaFileKey", "media/sample.jpg");
+
+    when(participationRepository.findByEvent_IdAndUserIdOrderByJoinedAtDesc(EVENT_ID, USER_ID))
+        .thenReturn(List.of(p));
+    when(rewardGrantRepository.findByParticipationIdIn(any())).thenReturn(List.of());
+    when(fileStorageService.getPresignedUrl("media/sample.jpg"))
+        .thenReturn("https://s3.example.com/media.jpg");
+
+    List<ParticipationResDto> result = service.getMyParticipationsForEvent(user, EVENT_ID);
+
+    assertThat(result).hasSize(1);
+    assertThat(result.get(0).participationId()).isEqualTo(OPEN_ID.toString());
+    assertThat(result.get(0).mediaUrl()).isEqualTo("https://s3.example.com/media.jpg");
+  }
+
+  @Test
+  @DisplayName("내 전체 구역 이벤트 참여 이력을 커서 페이징 조회할 수 있다")
+  void getMyParticipations() {
+    ZoneEventParticipation p =
+        ZoneEventParticipation.builder()
+            .event(event)
+            .userId(USER_ID)
+            .gpsLat(35.153)
+            .gpsLng(129.118)
+            .joinedAt(OffsetDateTime.now())
+            .status(ParticipationStatus.SUCCESS)
+            .build();
+    ReflectionTestUtils.setField(p, "id", OPEN_ID);
+
+    org.springframework.data.domain.Page<ZoneEventParticipation> page =
+        new org.springframework.data.domain.PageImpl<>(List.of(p));
+    when(participationRepository.findAll(
+            any(org.springframework.data.jpa.domain.Specification.class),
+            any(org.springframework.data.domain.PageRequest.class)))
+        .thenReturn(page);
+    when(rewardGrantRepository.findByParticipationIdIn(any())).thenReturn(List.of());
+
+    var response = service.getMyParticipations(user, null, 10, null, null, null, null, null);
+
+    assertThat(response.items()).hasSize(1);
+    assertThat(response.hasNext()).isFalse();
+  }
+
+  @Test
+  @DisplayName("참여 이력 커서 디코딩 및 필터 조건을 적용하여 조회한다")
+  void getMyParticipationsWithCursorAndFilters() {
+    ZoneEventParticipation p1 =
+        ZoneEventParticipation.builder()
+            .event(event)
+            .userId(USER_ID)
+            .gpsLat(35.153)
+            .gpsLng(129.118)
+            .joinedAt(OffsetDateTime.now())
+            .status(ParticipationStatus.SUCCESS)
+            .build();
+    ReflectionTestUtils.setField(p1, "id", OPEN_ID);
+    ReflectionTestUtils.setField(p1, "mediaFileKey", "media/sample.jpg");
+
+    when(fileStorageService.getPresignedUrl("media/sample.jpg"))
+        .thenReturn("https://s3.example.com/media.jpg");
+
+    ZoneEventParticipation p2 =
+        ZoneEventParticipation.builder()
+            .event(event)
+            .userId(USER_ID)
+            .gpsLat(35.153)
+            .gpsLng(129.118)
+            .joinedAt(OffsetDateTime.now().minusMinutes(10))
+            .status(ParticipationStatus.SUCCESS)
+            .build();
+    ReflectionTestUtils.setField(p2, "id", UUID.randomUUID());
+
+    org.springframework.data.domain.Page<ZoneEventParticipation> page =
+        new org.springframework.data.domain.PageImpl<>(List.of(p1, p2));
+    when(participationRepository.findAll(
+            any(org.springframework.data.jpa.domain.Specification.class),
+            any(org.springframework.data.domain.PageRequest.class)))
+        .thenAnswer(
+            inv -> {
+              org.springframework.data.jpa.domain.Specification<ZoneEventParticipation> spec =
+                  inv.getArgument(0);
+              if (spec != null) {
+                jakarta.persistence.criteria.Root<ZoneEventParticipation> root =
+                    mock(
+                        jakarta.persistence.criteria.Root.class,
+                        org.mockito.Mockito.RETURNS_DEEP_STUBS);
+                jakarta.persistence.criteria.CriteriaQuery<?> cq =
+                    mock(jakarta.persistence.criteria.CriteriaQuery.class);
+                jakarta.persistence.criteria.CriteriaBuilder cb =
+                    mock(
+                        jakarta.persistence.criteria.CriteriaBuilder.class,
+                        org.mockito.Mockito.RETURNS_DEEP_STUBS);
+                spec.toPredicate(root, cq, cb);
+              }
+              return page;
+            });
+    when(rewardGrantRepository.findByParticipationIdIn(any())).thenReturn(List.of());
+
+    String cursor =
+        java.util.Base64.getUrlEncoder()
+            .encodeToString("2026-09-01T00:00:00Z_00000000-0000-0000-0000-000000000001".getBytes());
+
+    var response =
+        service.getMyParticipations(
+            user,
+            cursor,
+            1,
+            "SUYEONG_NAMGU",
+            "PLACE_AUTH",
+            ParticipationStatus.SUCCESS,
+            OffsetDateTime.now().minusDays(1),
+            OffsetDateTime.now().plusDays(1));
+
+    assertThat(response.items()).hasSize(1);
+    assertThat(response.hasNext()).isTrue();
+    assertThat(response.nextCursor()).isNotNull();
+    assertThat(response.items().get(0).mediaUrl()).isEqualTo("https://s3.example.com/media.jpg");
+  }
+
+  @Test
+  @DisplayName("참여 이력이 없는 경우 빈 페이지를 반환한다")
+  void getMyParticipationsEmpty() {
+    when(participationRepository.findAll(
+            any(org.springframework.data.jpa.domain.Specification.class),
+            any(org.springframework.data.domain.PageRequest.class)))
+        .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
+
+    var response = service.getMyParticipations(user, null, 10, null, null, null, null, null);
+    assertThat(response.items()).isEmpty();
+    assertThat(response.hasNext()).isFalse();
+    assertThat(response.nextCursor()).isNull();
+  }
+
+  @Test
+  @DisplayName("잘못된 커서 전달 시 IllegalArgumentException을 던진다")
+  void getMyParticipationsInvalidCursor() {
+    assertThatThrownBy(
+            () ->
+                service.getMyParticipations(
+                    user, "invalid_cursor", 10, null, null, null, null, null))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 참여 취소 시 404를 반환한다")
+  void cancelNotFound() {
+    when(participationRepository.findByIdAndEvent_Id(OPEN_ID, EVENT_ID))
+        .thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service.cancel(user, EVENT_ID, OPEN_ID))
+        .isInstanceOf(com.butingbe.global.error.exception.ResourceNotFoundException.class);
   }
 }
