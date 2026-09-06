@@ -32,4 +32,22 @@ public record AuthenticatedUser(
         && authorities.stream()
             .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
   }
+
+  public UUID getUserId() {
+    return id;
+  }
+
+  public com.butingbe.domain.user.entity.UserRole getRole() {
+    if (authorities != null) {
+      for (GrantedAuthority authority : authorities) {
+        if ("ROLE_ADMIN".equals(authority.getAuthority())) {
+          return com.butingbe.domain.user.entity.UserRole.ADMIN;
+        }
+        if ("ROLE_MANAGER".equals(authority.getAuthority())) {
+          return com.butingbe.domain.user.entity.UserRole.MANAGER;
+        }
+      }
+    }
+    return com.butingbe.domain.user.entity.UserRole.USER;
+  }
 }

@@ -34,6 +34,7 @@ src/main/java/com/butingbe
 │   ├── chat            # Regional chatrooms over STOMP/WebSocket
 │   ├── file            # S3 uploads and file metadata
 │   ├── place           # Place catalog backed by TourAPI and Google Places
+│   ├── reward          # Reward catalog, grants, point ledger and badges (Phase 1)
 │   ├── route           # Travel time, distance, visit-order and alternative routes
 │   ├── station         # Station reference data
 │   ├── storage         # Luggage storage locations
@@ -43,7 +44,7 @@ src/main/java/com/butingbe
 │   ├── travelsurvey    # Travel preference survey
 │   ├── travelteam      # Team members and invitations
 │   ├── user            # User profile
-│   └── zoneevent       # Zone events: on-site GPS authentication missions (Phase 1)
+│   └── zoneevent       # Zone events: on-site GPS missions, rounds and slots (Phase 1-2)
 └── global
     ├── common          # ApiResponse, BaseEntity, TimestampEntity
     ├── config          # AppConfig, SecurityConfig, WebConfig, WebSocketConfig, S3Config, I18nConfig
@@ -101,6 +102,15 @@ Request flow:
 | `/api/v1/travel/team`                        | `TravelTeamController`          | Team members, leader, invitations                  |
 | `/api/v1/chat/rooms`                         | `LocalChatroomController`       | Chatroom lookup, join, exit, message history       |
 | `/api/v1/files`                              | `FileController`                | Multipart upload to S3                             |
+| `/api/v1/zone-events`                        | `ZoneEventController`           | Active zone events and event detail (Phase 1)      |
+| `/api/v1/zone-events/{eventId}/participations` | `ZoneEventParticipationController` | Join, submit, cancel, and my participations for an event |
+| `/api/v1/users/me/zone-event-participations` | `ZoneEventMeController`         | My zone event participation history (cursor paging) |
+| `/api/v1/users/me/rewards`, `/point-ledger`  | `UserRewardController`          | My reward summary (badges by zone, balance) and point ledger |
+| `/api/v1/admin/zone-events`                  | `AdminZoneEventController`      | Operator event CRUD and state transitions (ADMIN/MANAGER) |
+<<<<<<< HEAD
+| `/api/v1/admin/reward-catalog`               | `AdminRewardCatalogController`  | Operator reward catalog CRUD and grant history (ADMIN/MANAGER) |
+=======
+>>>>>>> origin/dev
 
 The generated OpenAPI specification lives at `src/main/resources/static/docs/openapi3.yaml`.
 

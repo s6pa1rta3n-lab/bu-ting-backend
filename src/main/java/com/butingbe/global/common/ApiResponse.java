@@ -14,9 +14,12 @@ public class ApiResponse<T> {
     this.data = data;
   }
 
-  // 🟢 성공 시 호출하는 메서드
   public static <T> ApiResponse<T> success(String message, T data) {
     return new ApiResponse<>(true, message, data);
+  }
+
+  public static <T> ApiResponse<T> success(T data) {
+    return new ApiResponse<>(true, "SUCCESS", data);
   }
 
   // 🔴 실패 시 호출하는 메서드
