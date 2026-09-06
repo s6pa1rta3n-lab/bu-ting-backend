@@ -12,4 +12,6 @@ public interface UserPointLedgerRepository
 
   @Query("SELECT COALESCE(SUM(l.amount), 0) FROM UserPointLedger l WHERE l.userId = :userId")
   long sumAmountByUserId(@Param("userId") UUID userId);
+
+  java.util.Optional<UserPointLedger> findByGrantId(UUID grantId);
 }

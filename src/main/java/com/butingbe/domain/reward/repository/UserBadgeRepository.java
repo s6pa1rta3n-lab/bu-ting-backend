@@ -10,4 +10,6 @@ public interface UserBadgeRepository extends JpaRepository<UserBadge, UUID> {
   boolean existsByUserIdAndReward_Id(UUID userId, UUID rewardId);
 
   List<UserBadge> findByUserIdOrderByEarnedAtDesc(UUID userId);
+
+  void deleteByGrantId(UUID grantId);
 }

@@ -51,6 +51,9 @@ public class AdminZoneEventService {
   private final ZoneEventParticipationRepository participationRepository;
   private final RewardCatalogRepository rewardCatalogRepository;
   private final OperatorAuthorization operatorAuthorization;
+  private final com.butingbe.domain.reward.service.TopLikeSettlementService
+      topLikeSettlementService;
+  private final com.butingbe.domain.reward.service.RewardRevokeService rewardRevokeService;
 
   @Transactional
   public AdminZoneEventResDto create(AuthenticatedUser user, AdminZoneEventCreateReqDto request) {
@@ -339,4 +342,28 @@ public class AdminZoneEventService {
   }
 
   private record Cursor(OffsetDateTime startsAt, UUID id) {}
+
+  /** 특정 이벤트의 TOP_LIKE 우수 보상을 정산한다. */
+  @Transactional
+  public com.butingbe.domain.reward.dto.response.TopLikeSettlementReportResDto settleEvent(
+      AuthenticatedUser user, UUID eventId) {
+    operatorAuthorization.requireOperator(user);
+    return topLikeSettlementService.settleEvent(eventId);
+  }
+
+  /** 특정 회차의 모든 이벤트에 대해 TOP_LIKE 우수 보상을 정산한다. */
+  @Transactional
+  public java.util.List<com.butingbe.domain.reward.dto.response.TopLikeSettlementReportResDto>
+      settleRound(AuthenticatedUser user, UUID roundId) {
+    operatorAuthorization.requireOperator(user);
+    return topLikeSettlementService.settleRound(roundId);
+  }
+
+  /** 참여를 무효화(REVOKED)하고 보상을 회수한다. */
+  @Transactional
+  public com.butingbe.domain.reward.dto.response.ParticipationRevokeResDto revokeParticipation(
+      AuthenticatedUser user, UUID participationId) {
+    operatorAuthorization.requireOperator(user);
+    return rewardRevokeService.revokeParticipation(participationId);
+  }
 }

@@ -17,4 +17,17 @@ public interface RewardGrantRepository
 
   List<RewardGrant> findByParticipationIdInAndRevokedAtIsNull(
       java.util.Collection<UUID> participationIds);
+
+  List<RewardGrant> findByParticipationIdAndRevokedAtIsNull(UUID participationId);
+
+  @org.springframework.data.jpa.repository.Query(
+      "SELECT count(g) FROM RewardGrant g WHERE g.reward.id = :rewardId "
+          + "AND g.grantedAt >= :startOfMonth AND g.grantedAt < :startOfNextMonth "
+          + "AND g.revokedAt IS NULL")
+  long countActiveGrantsInMonth(
+      @org.springframework.data.repository.query.Param("rewardId") UUID rewardId,
+      @org.springframework.data.repository.query.Param("startOfMonth")
+          java.time.OffsetDateTime startOfMonth,
+      @org.springframework.data.repository.query.Param("startOfNextMonth")
+          java.time.OffsetDateTime startOfNextMonth);
 }

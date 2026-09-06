@@ -177,6 +177,59 @@ class AdminZoneEventControllerTest {
         .andExpect(jsonPath("$.data.status").value("CANCELLED"));
   }
 
+  @Test
+  @DisplayName("우수 보상 정산 실행 시 200과 리포트를 반환한다")
+  void settle() throws Exception {
+    when(adminZoneEventService.settleEvent(any(), eq(EVENT_ID)))
+        .thenReturn(
+            new com.butingbe.domain.reward.dto.response.TopLikeSettlementReportResDto(
+                EVENT_ID, 1, 1, 0, 0, List.of()));
+
+    mockMvc
+        .perform(post("/admin/zone-events/{eventId}/settle", EVENT_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.targetId").value(EVENT_ID.toString()))
+        .andExpect(jsonPath("$.data.totalGranted").value(1));
+  }
+
+  @Test
+  @DisplayName("회차 우수 보상 정산 실행 시 200과 리포트 목록을 반환한다")
+  void settleRound() throws Exception {
+    UUID roundId = UUID.randomUUID();
+    when(adminZoneEventService.settleRound(any(), eq(roundId)))
+        .thenReturn(
+            List.of(
+                new com.butingbe.domain.reward.dto.response.TopLikeSettlementReportResDto(
+                    EVENT_ID, 1, 1, 0, 0, List.of())));
+
+    mockMvc
+        .perform(post("/admin/zone-events/rounds/{roundId}/settle", roundId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].targetId").value(EVENT_ID.toString()));
+  }
+
+  @Test
+  @DisplayName("참여 무효화 및 보상 회수 실행 시 200과 회수 결과를 반환한다")
+  void revokeParticipation() throws Exception {
+    UUID participationId = UUID.randomUUID();
+    when(adminZoneEventService.revokeParticipation(any(), eq(participationId)))
+        .thenReturn(
+            new com.butingbe.domain.reward.dto.response.ParticipationRevokeResDto(
+                participationId,
+                com.butingbe.domain.zoneevent.entity.ParticipationStatus.REVOKED,
+                2,
+                50,
+                1));
+
+    mockMvc
+        .perform(
+            post("/admin/zone-events/participations/{participationId}/revoke", participationId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.participationId").value(participationId.toString()))
+        .andExpect(jsonPath("$.data.status").value("REVOKED"))
+        .andExpect(jsonPath("$.data.revokedPointsAmount").value(50));
+  }
+
   private AdminZoneEventResDto detail(String status) {
     return new AdminZoneEventResDto(
         EVENT_ID.toString(),

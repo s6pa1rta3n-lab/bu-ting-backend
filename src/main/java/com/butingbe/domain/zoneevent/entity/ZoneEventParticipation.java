@@ -108,7 +108,8 @@ public class ZoneEventParticipation extends TimestampEntity {
       Double gpsLat,
       Double gpsLng,
       OffsetDateTime joinedAt,
-      ParticipationVisibility visibility) {
+      ParticipationVisibility visibility,
+      Long likeCount) {
     this.event = event;
     this.userId = userId;
     this.status = status;
@@ -117,7 +118,7 @@ public class ZoneEventParticipation extends TimestampEntity {
     this.joinedAt = joinedAt;
     this.visibility = visibility == null ? ParticipationVisibility.PUBLIC : visibility;
     this.hidden = false;
-    this.likeCount = 0L;
+    this.likeCount = likeCount != null ? likeCount : 0L;
     this.commentCount = 0;
   }
 
@@ -152,6 +153,11 @@ public class ZoneEventParticipation extends TimestampEntity {
   public void cancel(String reason) {
     this.status = ParticipationStatus.CANCELLED;
     this.cancelReason = reason;
+  }
+
+  /** 참여를 회수(REVOKED) 상태로 변경한다. */
+  public void revoke() {
+    this.status = ParticipationStatus.REVOKED;
   }
 
   /** 반경 검증을 통과한 참여를 JOINED 상태로 시작한다. */

@@ -478,4 +478,48 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
             .role(role)
             .build());
   }
+
+  @Test
+  @DisplayName(
+      "운영자가 아니면 settleEvent, settleRound, revokeParticipation 호출 시 ForbiddenException이 발생한다")
+  void operatorRequiredForSettleAndRevoke() {
+    UUID dummyId = UUID.randomUUID();
+
+    assertThatThrownBy(() -> adminZoneEventService.settleEvent(normalUser, dummyId))
+        .isInstanceOf(ForbiddenException.class);
+
+    assertThatThrownBy(() -> adminZoneEventService.settleRound(normalUser, dummyId))
+        .isInstanceOf(ForbiddenException.class);
+
+    assertThatThrownBy(() -> adminZoneEventService.revokeParticipation(normalUser, dummyId))
+        .isInstanceOf(ForbiddenException.class);
+  }
+
+  @Test
+  @DisplayName("운영자가 settleEvent와 settleRound를 호출할 수 있다")
+  void settleEventAndRoundByOperator() {
+    AdminZoneEventResDto created = adminZoneEventService.create(operator, createRequest());
+
+    UUID eventId = UUID.fromString(created.eventId());
+    var report = adminZoneEventService.settleEvent(operator, eventId);
+    assertThat(report.totalCandidates()).isEqualTo(0);
+
+    UUID roundId = UUID.randomUUID();
+    var roundReports = adminZoneEventService.settleRound(operator, roundId);
+    assertThat(roundReports).isEmpty();
+  }
+
+  @Test
+  @DisplayName("운영자가 revokeParticipation을 호출하여 성공한 참여를 무효화할 수 있다")
+  void revokeParticipationByOperator() {
+    AdminZoneEventResDto created = adminZoneEventService.create(operator, createRequest());
+
+    UUID eventId = UUID.fromString(created.eventId());
+    ZoneEventParticipation p =
+        saveParticipation(eventId, normalUser.id(), ParticipationStatus.SUCCESS);
+
+    var result = adminZoneEventService.revokeParticipation(operator, p.getId());
+    assertThat(result.status()).isEqualTo(ParticipationStatus.REVOKED);
+    assertThat(p.getStatus()).isEqualTo(ParticipationStatus.REVOKED);
+  }
 }

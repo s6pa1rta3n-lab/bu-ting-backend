@@ -47,6 +47,9 @@ class RewardQueryServiceTest extends AbstractContainerTest {
   @Autowired private ZoneEventTypeRepository zoneEventTypeRepository;
   @Autowired private UserRepository userRepository;
 
+  @Autowired
+  private com.butingbe.domain.reward.repository.UserCouponRepository userCouponRepository;
+
   private UUID userId;
   private AuthenticatedUser user;
   private ZoneEventType type;
@@ -95,6 +98,41 @@ class RewardQueryServiceTest extends AbstractContainerTest {
               assertThat(group.items().get(0).code()).isEqualTo("SPOT_A");
             });
     assertThat(rewards.coupons()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("발급된 쿠폰이 있으면 쿠폰함 목록을 포함하여 반환한다")
+  void myRewardsIncludesCoupons() {
+    RewardCatalog couponCatalog =
+        rewardCatalogRepository.save(
+            RewardCatalog.builder()
+                .rewardType(RewardType.COUPON)
+                .code("CPN_COFFEE")
+                .name("커피 쿠폰")
+                .build());
+
+    RewardGrant grant =
+        rewardGrantRepository.save(
+            RewardGrant.builder()
+                .userId(userId)
+                .reward(couponCatalog)
+                .grantReason(GrantReason.TOP_LIKE)
+                .grantedAt(OffsetDateTime.now())
+                .build());
+
+    userCouponRepository.save(
+        com.butingbe.domain.reward.entity.UserCoupon.builder()
+            .userId(userId)
+            .reward(couponCatalog)
+            .grantId(grant.getId())
+            .couponCode("CPN-1234")
+            .status(com.butingbe.domain.reward.entity.CouponStatus.ISSUED)
+            .issuedAt(OffsetDateTime.now())
+            .build());
+
+    UserRewardsResDto rewards = rewardQueryService.myRewards(user);
+    assertThat(rewards.coupons()).hasSize(1);
+    assertThat(rewards.coupons().get(0).couponCode()).isEqualTo("CPN-1234");
   }
 
   @Test

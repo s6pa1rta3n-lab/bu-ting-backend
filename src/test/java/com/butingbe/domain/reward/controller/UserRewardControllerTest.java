@@ -41,6 +41,7 @@ class UserRewardControllerTest {
   private static final UUID USER_ID = UUID.fromString("22222222-0000-0000-0000-000000000001");
 
   @Mock private RewardQueryService rewardQueryService;
+  @Mock private com.butingbe.domain.reward.service.UserCouponService userCouponService;
   @InjectMocks private UserRewardController controller;
 
   private MockMvc mockMvc;
@@ -98,6 +99,63 @@ class UserRewardControllerTest {
         .andExpect(jsonPath("$.data.items[0].amount").value(50))
         .andExpect(jsonPath("$.data.nextCursor").value("next"))
         .andExpect(jsonPath("$.data.hasNext").value(true));
+  }
+
+  @Test
+  @DisplayName("쿠폰함을 상태 조건과 함께 200으로 반환한다")
+  void myCoupons() throws Exception {
+    UUID couponId = UUID.randomUUID();
+    UUID rewardId = UUID.randomUUID();
+    when(userCouponService.getMyCoupons(
+            any(), eq(com.butingbe.domain.reward.entity.CouponStatus.ISSUED)))
+        .thenReturn(
+            List.of(
+                new com.butingbe.domain.reward.dto.response.UserCouponResDto(
+                    couponId,
+                    rewardId,
+                    "COUPON_COFFEE",
+                    "아메리카노 쿠폰",
+                    "CPN-1234",
+                    com.butingbe.domain.reward.entity.CouponStatus.ISSUED,
+                    "https://signed/coupon.png",
+                    OffsetDateTime.now().plusDays(7),
+                    OffsetDateTime.now(),
+                    null)));
+
+    mockMvc
+        .perform(get("/users/me/coupons").param("status", "ISSUED"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].couponId").value(couponId.toString()))
+        .andExpect(jsonPath("$.data[0].couponCode").value("CPN-1234"))
+        .andExpect(jsonPath("$.data[0].status").value("ISSUED"));
+  }
+
+  @Test
+  @DisplayName("쿠폰 사용 완료 시 200과 사용된 쿠폰 정보를 반환한다")
+  void useCoupon() throws Exception {
+    UUID couponId = UUID.randomUUID();
+    UUID rewardId = UUID.randomUUID();
+    when(userCouponService.useCoupon(any(), eq(couponId)))
+        .thenReturn(
+            new com.butingbe.domain.reward.dto.response.UserCouponResDto(
+                couponId,
+                rewardId,
+                "COUPON_COFFEE",
+                "아메리카노 쿠폰",
+                "CPN-1234",
+                com.butingbe.domain.reward.entity.CouponStatus.USED,
+                "https://signed/coupon.png",
+                OffsetDateTime.now().plusDays(7),
+                OffsetDateTime.now(),
+                OffsetDateTime.now()));
+
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                "/users/me/coupons/{couponId}/use", couponId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.couponId").value(couponId.toString()))
+        .andExpect(jsonPath("$.data.status").value("USED"));
   }
 
   private HandlerMethodArgumentResolver authenticatedUserResolver() {

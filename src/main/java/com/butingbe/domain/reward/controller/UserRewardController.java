@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserRewardController {
 
   private final RewardQueryService rewardQueryService;
+  private final com.butingbe.domain.reward.service.UserCouponService userCouponService;
 
   @GetMapping("/rewards")
   public ResponseEntity<ApiResponse<UserRewardsResDto>> myRewards(
@@ -34,5 +35,24 @@ public class UserRewardController {
       @RequestParam(required = false) Integer size) {
     return ResponseEntity.ok(
         ApiResponse.success("포인트 원장 조회", rewardQueryService.pointLedger(user, cursor, size)));
+  }
+
+  @GetMapping("/coupons")
+  public ResponseEntity<
+          ApiResponse<java.util.List<com.butingbe.domain.reward.dto.response.UserCouponResDto>>>
+      myCoupons(
+          @AuthenticationPrincipal AuthenticatedUser user,
+          @RequestParam(required = false) com.butingbe.domain.reward.entity.CouponStatus status) {
+    return ResponseEntity.ok(
+        ApiResponse.success("쿠폰함 조회", userCouponService.getMyCoupons(user, status)));
+  }
+
+  @org.springframework.web.bind.annotation.PostMapping("/coupons/{couponId}/use")
+  public ResponseEntity<ApiResponse<com.butingbe.domain.reward.dto.response.UserCouponResDto>>
+      useCoupon(
+          @AuthenticationPrincipal AuthenticatedUser user,
+          @org.springframework.web.bind.annotation.PathVariable java.util.UUID couponId) {
+    return ResponseEntity.ok(
+        ApiResponse.success("쿠폰 사용 완료", userCouponService.useCoupon(user, couponId)));
   }
 }

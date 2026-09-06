@@ -56,11 +56,12 @@ public class RewardQueryService {
   private final ZoneEventRepository zoneEventRepository;
   private final UserPointService userPointService;
   private final FileStorageService fileStorageService;
+  private final com.butingbe.domain.reward.repository.UserCouponRepository userCouponRepository;
 
   @Value("${file-storage.s3.presigned-url-expiration:3600}")
   private int presignedUrlExpiration;
 
-  /** 포인트 잔액 + 구역별 배지. 쿠폰은 Phase 2부터. */
+  /** 포인트 잔액 + 구역별 배지 + 쿠폰함. */
   public UserRewardsResDto myRewards(AuthenticatedUser user) {
     UUID userId = requireUserId(user);
     List<UserBadge> badges = userBadgeRepository.findByUserIdOrderByEarnedAtDesc(userId);
@@ -83,7 +84,16 @@ public class RewardQueryService {
         grouped.entrySet().stream()
             .map(entry -> new BadgeGroup(entry.getKey(), entry.getValue()))
             .toList();
-    return new UserRewardsResDto(userPointService.getBalance(userId), badgeGroups, List.of());
+
+    List<com.butingbe.domain.reward.dto.response.UserCouponResDto> coupons =
+        userCouponRepository.findByUserIdOrderByIssuedAtDesc(userId).stream()
+            .map(
+                coupon ->
+                    com.butingbe.domain.reward.dto.response.UserCouponResDto.of(
+                        coupon, presignedUrl(coupon.getReward().getImageFileKey())))
+            .toList();
+
+    return new UserRewardsResDto(userPointService.getBalance(userId), badgeGroups, coupons);
   }
 
   /** 포인트 원장. createdAt 내림차순 커서 페이징. */
