@@ -104,4 +104,103 @@ public class ZoneEvent extends BaseEntity {
   public OffsetDateTime endsAt() {
     return startsAt.plusMinutes(durationMinutes);
   }
+
+  /** 이벤트를 활성화한다. */
+  public void activate() {
+    this.status = ZoneEventStatus.ACTIVE;
+  }
+
+  /** 이벤트를 종료한다. */
+  public void close() {
+    this.status = ZoneEventStatus.CLOSED;
+  }
+
+  /** 이벤트를 취소한다. */
+  public void cancel() {
+    this.status = ZoneEventStatus.CANCELLED;
+  }
+
+  /**
+   * 진행 중 상태에서 수정 가능한 필드를 갱신한다.
+   *
+   * @param title 이벤트 제목
+   * @param description 이벤트 설명
+   * @param durationMinutes 진행 시간(분)
+   * @param excellenceReward 우수 인증 보상
+   * @param successLimitPerUser 유저당 성공 상한
+   */
+  public void updateActive(
+      String title,
+      String description,
+      Integer durationMinutes,
+      RewardSnapshot excellenceReward,
+      Integer successLimitPerUser) {
+    if (title != null) {
+      this.title = title;
+    }
+    if (description != null) {
+      this.description = description;
+    }
+    if (durationMinutes != null) {
+      this.durationMinutes = durationMinutes;
+    }
+    if (excellenceReward != null) {
+      this.excellenceReward = excellenceReward;
+    }
+    if (successLimitPerUser != null) {
+      this.successLimitPerUser = successLimitPerUser;
+    }
+  }
+
+  /**
+   * 예정 상태에서 전체 설정을 수정한다.
+   *
+   * @param zoneId 구역 식별자
+   * @param type 이벤트 유형
+   * @param title 이벤트 제목
+   * @param description 이벤트 설명
+   * @param startsAt 시작 시각
+   * @param durationMinutes 진행 시간(분)
+   * @param baseReward 기본 보상
+   * @param excellenceReward 우수 인증 보상
+   * @param successLimitPerUser 유저당 성공 상한
+   */
+  public void updateScheduled(
+      String zoneId,
+      ZoneEventType type,
+      String title,
+      String description,
+      OffsetDateTime startsAt,
+      Integer durationMinutes,
+      RewardSnapshot baseReward,
+      RewardSnapshot excellenceReward,
+      Integer successLimitPerUser) {
+    if (zoneId != null) {
+      this.zoneId = zoneId;
+    }
+    if (type != null) {
+      this.type = type;
+    }
+    if (title != null) {
+      this.title = title;
+    }
+    if (description != null) {
+      this.description = description;
+    }
+    if (startsAt != null) {
+      this.startsAt = startsAt;
+    }
+    if (durationMinutes != null) {
+      this.durationMinutes = durationMinutes;
+    }
+    if (baseReward != null) {
+      this.baseReward = baseReward;
+    }
+    if (excellenceReward != null) {
+      this.excellenceReward = excellenceReward;
+    }
+    if (successLimitPerUser != null) {
+      this.successLimitPerUser = successLimitPerUser;
+    }
+  }
 }

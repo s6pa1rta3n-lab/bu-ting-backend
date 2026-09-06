@@ -80,4 +80,51 @@ public class ZoneEventAuthTarget extends BaseEntity {
     this.longitude = longitude;
     this.radiusM = radiusM;
   }
+
+  /**
+   * 인증 타겟 정보를 수정한다.
+   *
+   * @param targetKind 타겟 구분
+   * @param landmarkId 랜드마크 ID
+   * @param placeName 장소/사물명
+   * @param guideText 인증 가이드 안내문
+   * @param exampleFileKey 예시 이미지 파일 키
+   * @param latitude 위도
+   * @param longitude 경도
+   * @param radiusM 인증 반경(미터)
+   */
+  public void update(
+      ZoneEventTargetKind targetKind,
+      String landmarkId,
+      String placeName,
+      String guideText,
+      String exampleFileKey,
+      Double latitude,
+      Double longitude,
+      Integer radiusM) {
+    if (targetKind != null) {
+      this.targetKind = targetKind;
+    }
+    if (landmarkId != null) {
+      this.landmarkId = landmarkId;
+    }
+    if (placeName != null) {
+      this.placeName = placeName;
+    }
+    if (guideText != null) {
+      this.guideText = guideText;
+    }
+    if (exampleFileKey != null) {
+      this.exampleFileKey = exampleFileKey;
+    }
+    if (latitude != null) {
+      this.latitude = latitude;
+    }
+    if (longitude != null) {
+      this.longitude = longitude;
+    }
+    if (radiusM != null) {
+      this.radiusM = radiusM;
+    }
+  }
 }
