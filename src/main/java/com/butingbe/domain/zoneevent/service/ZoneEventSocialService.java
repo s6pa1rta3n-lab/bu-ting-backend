@@ -2,6 +2,7 @@ package com.butingbe.domain.zoneevent.service;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.auth.security.OperatorAuthorization;
+import com.butingbe.domain.reward.service.RewardPayoutHoldService;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.domain.zoneevent.dto.response.CommentPageResDto;
@@ -62,6 +63,7 @@ public class ZoneEventSocialService {
   private final UserRepository userRepository;
   private final OperatorAuthorization operatorAuthorization;
   private final ZoneTitleService zoneTitleService;
+  private final RewardPayoutHoldService rewardPayoutHoldService;
 
   @Value("${zone-event.report.auto-hide-threshold:3}")
   private long autoHideThreshold;
@@ -200,6 +202,7 @@ public class ZoneEventSocialService {
     if (reportRepository.countByParticipationId(participationId) >= autoHideThreshold) {
       participation.hide();
     }
+    rewardPayoutHoldService.holdUnpaidPayouts(participationId);
     return ReportResDto.from(report);
   }
 

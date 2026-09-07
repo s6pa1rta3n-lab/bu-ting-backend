@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.reward.entity.BaseRewardPayout;
+import com.butingbe.domain.reward.entity.PayoutHoldStatus;
+import com.butingbe.domain.reward.repository.BaseRewardPayoutRepository;
 import com.butingbe.domain.user.entity.Name;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
@@ -41,8 +44,10 @@ class ZoneEventSocialServiceTest extends AbstractContainerTest {
   @Autowired private ZoneEventTypeRepository zoneEventTypeRepository;
   @Autowired private ZoneEventParticipationRepository participationRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private BaseRewardPayoutRepository baseRewardPayoutRepository;
 
   private ZoneEvent event;
+
   private UUID authorId;
   private AuthenticatedUser viewer;
 
@@ -163,6 +168,24 @@ class ZoneEventSocialServiceTest extends AbstractContainerTest {
     socialService.report(user(savedUser("r3").getId()), participationId, "INAPPROPRIATE", null);
     assertThat(participationRepository.findById(participationId).orElseThrow().getHidden())
         .isTrue();
+  }
+
+  @Test
+  @DisplayName("신고가 접수되면 해당 참여의 미지급 보상이 자동으로 보류(HELD_REPORT)된다")
+  void reportHoldsUnpaidPayouts() {
+    UUID participationId = publicSuccess().getId();
+    BaseRewardPayout basePayout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(participationId)
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+
+    socialService.report(viewer, participationId, "NOT_ON_SITE", "현장 아님");
+
+    BaseRewardPayout reloaded =
+        baseRewardPayoutRepository.findById(basePayout.getId()).orElseThrow();
+    assertThat(reloaded.getHoldStatus()).isEqualTo(PayoutHoldStatus.HELD_REPORT);
   }
 
   @Test
