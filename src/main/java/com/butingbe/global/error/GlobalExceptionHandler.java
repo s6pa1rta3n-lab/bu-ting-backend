@@ -1,6 +1,7 @@
 package com.butingbe.global.error;
 
 import com.butingbe.domain.place.exception.PlaceKeywordNotFoundException;
+import com.butingbe.domain.reward.exception.RewardPayoutConflictException;
 import com.butingbe.domain.travel.ai.TravelPlanValidationException;
 import com.butingbe.domain.zoneevent.exception.OpenParticipationExistsException;
 import com.butingbe.domain.zoneevent.exception.ZoneEventOutOfRangeException;
@@ -131,6 +132,19 @@ public class GlobalExceptionHandler {
         e.getParticipationId() == null
             ? Map.of()
             : Map.of("participationId", e.getParticipationId().toString());
+    return ResponseEntity.status(HttpStatus.CONFLICT)
+        .body(ApiResponse.fail(message(e.getMessage(), request), data));
+  }
+
+  @ExceptionHandler(RewardPayoutConflictException.class)
+  public ResponseEntity<ApiResponse<Map<String, Object>>> handleRewardPayoutConflict(
+      RewardPayoutConflictException e, HttpServletRequest request) {
+    log.warn("Reward payout conflict: {}", e.getMessage());
+
+    Map<String, Object> data =
+        Map.of(
+            "problematicPayoutIds", e.getProblematicPayoutIds(),
+            "payoutIds", e.getProblematicPayoutIds());
     return ResponseEntity.status(HttpStatus.CONFLICT)
         .body(ApiResponse.fail(message(e.getMessage(), request), data));
   }

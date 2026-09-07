@@ -14,6 +14,8 @@ public interface RewardGrantRepository
   boolean existsByParticipationIdAndGrantReasonAndReward_Id(
       UUID participationId, GrantReason grantReason, UUID rewardId);
 
+  boolean existsByParticipationIdAndGrantReason(UUID participationId, GrantReason grantReason);
+
   List<RewardGrant> findByUserIdOrderByGrantedAtDesc(UUID userId);
 
   List<RewardGrant> findByParticipationIdInAndRevokedAtIsNull(
