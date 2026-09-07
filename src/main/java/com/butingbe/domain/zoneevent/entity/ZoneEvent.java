@@ -1,6 +1,7 @@
 package com.butingbe.domain.zoneevent.entity;
 
 import com.butingbe.global.common.BaseEntity;
+import com.butingbe.global.error.exception.ConflictException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -12,6 +13,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -74,11 +76,20 @@ public class ZoneEvent extends BaseEntity {
   @Column(name = "success_limit_per_user", nullable = false)
   private Integer successLimitPerUser;
 
+  /** 회차 내 슬롯 식별자(예: "1-A"). 회차·타겟 API가 배정한다. */
+  @Column(name = "slot_code", length = 10)
+  private String slotCode;
+
+  @Version
+  @Column(nullable = false)
+  private Long revision;
+
   @Builder
   private ZoneEvent(
       String zoneId,
       ZoneEventType type,
       UUID roundId,
+      String slotCode,
       String title,
       String description,
       OffsetDateTime startsAt,
@@ -90,6 +101,7 @@ public class ZoneEvent extends BaseEntity {
     this.zoneId = zoneId;
     this.type = type;
     this.roundId = roundId;
+    this.slotCode = slotCode;
     this.title = title;
     this.description = description;
     this.startsAt = startsAt;
@@ -103,5 +115,73 @@ public class ZoneEvent extends BaseEntity {
   /** 이벤트 종료 시각. starts_at + duration. */
   public OffsetDateTime endsAt() {
     return startsAt.plusMinutes(durationMinutes);
+  }
+
+  /** SCHEDULED → ACTIVE. 다른 상태에서 호출하면 409. */
+  public void activate() {
+    requireStatus(ZoneEventStatus.SCHEDULED);
+    this.status = ZoneEventStatus.ACTIVE;
+  }
+
+  /** ACTIVE → CLOSED. */
+  public void close() {
+    requireStatus(ZoneEventStatus.ACTIVE);
+    this.status = ZoneEventStatus.CLOSED;
+  }
+
+  /** SCHEDULED/ACTIVE → CANCELLED. 이미 종료·취소된 이벤트는 취소할 수 없다. */
+  public void markCancelled() {
+    if (status != ZoneEventStatus.SCHEDULED && status != ZoneEventStatus.ACTIVE) {
+      throw new ConflictException("error.zone_event.invalid_state");
+    }
+    this.status = ZoneEventStatus.CANCELLED;
+  }
+
+  /** 상태와 무관하게 수정 가능한 항목(제목·설명·기간·성공 상한·우수 보상). null은 건너뛴다. */
+  public void applyEditable(
+      String title,
+      String description,
+      Integer durationMinutes,
+      Integer successLimitPerUser,
+      RewardSnapshot excellenceReward,
+      boolean excellenceRewardPresent) {
+    if (title != null) {
+      this.title = title;
+    }
+    if (description != null) {
+      this.description = description;
+    }
+    if (durationMinutes != null) {
+      this.durationMinutes = durationMinutes;
+    }
+    if (successLimitPerUser != null) {
+      this.successLimitPerUser = successLimitPerUser;
+    }
+    if (excellenceRewardPresent) {
+      this.excellenceReward = excellenceReward;
+    }
+  }
+
+  /** SCHEDULED 상태에서만 바꿀 수 있는 항목(구역·타입·시작 시각·기본 보상). null은 건너뛴다. */
+  public void applyScheduledOnly(
+      String zoneId, ZoneEventType type, OffsetDateTime startsAt, RewardSnapshot baseReward) {
+    if (zoneId != null) {
+      this.zoneId = zoneId;
+    }
+    if (type != null) {
+      this.type = type;
+    }
+    if (startsAt != null) {
+      this.startsAt = startsAt;
+    }
+    if (baseReward != null) {
+      this.baseReward = baseReward;
+    }
+  }
+
+  private void requireStatus(ZoneEventStatus expected) {
+    if (status != expected) {
+      throw new ConflictException("error.zone_event.invalid_state");
+    }
   }
 }
