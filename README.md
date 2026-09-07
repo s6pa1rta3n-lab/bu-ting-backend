@@ -34,6 +34,7 @@ src/main/java/com/butingbe
 │   ├── chat            # Regional chatrooms over STOMP/WebSocket
 │   ├── file            # S3 uploads and file metadata
 │   ├── place           # Place catalog backed by TourAPI and Google Places
+│   ├── reward          # Reward catalog, grants, point ledger and badges (Phase 1)
 │   ├── route           # Travel time, distance, visit-order and alternative routes
 │   ├── station         # Station reference data
 │   ├── storage         # Luggage storage locations
@@ -41,9 +42,11 @@ src/main/java/com/butingbe
 │   ├── travelexpense   # Expenses and settlements
 │   ├── travelrecord    # Travel records, reviews, likes, bookmarks, comments
 │   ├── travelsurvey    # Travel preference survey
+│   ├── notification    # Push: device tokens, subscriptions, settings (Phase 2)
 │   ├── travelteam      # Team members and invitations
 │   ├── user            # User profile
-│   └── zoneevent       # Zone events: on-site GPS authentication missions (Phase 1)
+│   ├── zonetitle       # Zone titles and city grade (Phase 2)
+│   └── zoneevent       # Zone events: on-site GPS missions, rounds and slots (Phase 1-2)
 └── global
     ├── common          # ApiResponse, BaseEntity, TimestampEntity
     ├── config          # AppConfig, SecurityConfig, WebConfig, WebSocketConfig, S3Config, I18nConfig
@@ -101,6 +104,20 @@ Request flow:
 | `/api/v1/travel/team`                        | `TravelTeamController`          | Team members, leader, invitations                  |
 | `/api/v1/chat/rooms`                         | `LocalChatroomController`       | Chatroom lookup, join, exit, message history       |
 | `/api/v1/files`                              | `FileController`                | Multipart upload to S3                             |
+| `/api/v1/zone-events`                        | `ZoneEventController`           | Active zone events and event detail (Phase 1)      |
+| `/api/v1/zone-events/{eventId}/participations` | `ZoneEventParticipationController` | Join, submit, cancel, and my participations for an event |
+| `/api/v1/zone-events/*/album`, `/zones/*/album`, `/zone-event-rounds/*/album` | `ZoneEventAlbumController`       | Public album feeds and participation visibility |
+| `/api/v1/zone-event-participations/{id}/likes`, `/comments`, `/reports` | `ZoneEventSocialController` | Likes, comments, and reports on public participations |
+| `/api/v1/admin/zone-event-participations`      | `AdminReviewController`         | Operator review queue: approve, reject, revoke, unhide |
+| `/api/v1/users/me/device-tokens`, `/zone-subscriptions`, `/notification-settings` | `UserNotificationController` | Push tokens, zone subscriptions, notification settings |
+| `/api/v1/admin/push`                          | `AdminPushController`           | Operator immediate push to a zone or everyone |
+| `/api/v1/zone-titles`, `/users/me/zone-titles`   | `ZoneTitleController`           | Zone title definitions, ownership, equip (Phase 2) |
+| `/api/v1/users/me/zone-event-participations` | `ZoneEventMeController`         | My zone event participation history (cursor paging) |
+| `/api/v1/users/me/rewards`, `/point-ledger`  | `UserRewardController`          | My reward summary (badges by zone, balance) and point ledger |
+| `/api/v1/admin/zone-events`                  | `AdminZoneEventController`      | Operator event CRUD and state transitions (ADMIN/MANAGER) |
+| `/api/v1/admin/reward-catalog`               | `AdminRewardCatalogController`  | Operator reward catalog CRUD and grant history (ADMIN/MANAGER) |
+| `/api/v1/admin/zone-event-rounds`            | `AdminRoundController`          | Operator round console: calendar, slots, backup/rain-swap targets, open/close/settle, settlement report (ADMIN/MANAGER) |
+| `/api/v1/zone-event-rounds/current`          | `ZoneEventRoundController`      | Current round status per zone (OPEN/REST/UPCOMING) |
 
 The generated OpenAPI specification lives at `src/main/resources/static/docs/openapi3.yaml`.
 
@@ -152,31 +169,39 @@ at startup.
 
 ## Run The Application
 
-Create a `.env` file in the project root. The Gradle `bootRun` task loads it and injects the values as environment
-variables before starting Spring Boot. `.env` is git-ignored — never commit it or place real keys anywhere tracked.
+Copy `.env.example` to `.env` in the project root and fill in the values (`cp .env.example .env`). The Gradle `bootRun`
+task loads `.env` and injects the values as environment variables before starting Spring Boot. `.env` is git-ignored —
+never commit it or place real keys anywhere tracked. `.env.example` documents every key with dummy values and marks
+which are required.
 
-Minimum values for a local run:
+Minimum values for a local run (everything else has a default and only disables its feature when unset):
 
 ```dotenv
-DB_URL=jdbc:postgresql://localhost:5433/mydb
-DB_USERNAME=myuser
-DB_PASSWORD=mypassword
+DB_URL=jdbc:postgresql://localhost:5433/buting
+DB_USERNAME=buting
+DB_PASSWORD=changeme
 ```
 
-Environment variables referenced by `application.yaml`, by feature:
+Environment variables referenced by `application.yaml` (and the AWS default credential chain), by feature:
 
 | Feature       | Variables                                                                                        |
 |---------------|--------------------------------------------------------------------------------------------------|
-| Database      | `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`                                                            |
+| Database      | `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` (required)                                                 |
 | AI            | `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`                                                           |
 | Google OAuth  | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_ALLOWED_AUDIENCES`, `GOOGLE_AND_DEBUG_CLIENT_ID`, `GOOGLE_AND_RELEASE_CLIENT_ID` |
 | Naver OAuth   | `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`, `NAVER_REDIRECT_URI`                                    |
 | Kakao OAuth   | `KAKAO_REST_API_KEY`, `KAKAO_CLIENT_SECRET`, `KAKAO_REDIRECT_URI`, `KAKAO_ALLOWED_AUDIENCES`, `KAKAO_AND_DEBUG_CLIENT_ID` |
 | Place APIs    | `TOUR_API_BASE_URL`, `TOURISM_API_KEY`, `GOOGLE_PLACES_BASE_URL`, `GOOGLE_PLACES_API_KEY`         |
 | S3            | `S3_BUCKET`, `AWS_REGION`, `S3_KEY_PREFIX`, `S3_MAX_FILE_SIZE`, `S3_PRESIGNED_URL_EXPIRATION`     |
+| AWS creds     | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (local only; on EC2 use the instance IAM role)       |
 | Upload limits | `FILE_MAX_SIZE`, `FILE_MAX_REQUEST_SIZE`                                                          |
 | Invitations   | `TRAVEL_INVITE_BASE_URL`                                                                          |
 | Routing       | `ROUTE_GOOGLE_ENABLED` (off by default), `ROUTE_GOOGLE_API_KEY` (falls back to `GOOGLE_PLACES_API_KEY`) |
+| Admin         | `ADMIN_TOKEN` (optional operator bootstrap token; unset disables it)                              |
+| Zone Event    | `ZONE_EVENT_REVIEW_MODE`, `ZONE_EVENT_REPORT_AUTO_HIDE_THRESHOLD`, `ZONE_EVENT_REVIEW_CAPTURED_AT_THRESHOLD_MINUTES`, `ZONE_EVENT_ROUND_SCHEDULER_DELAY_MS`, `ZONE_EVENT_ROUND_SCHEDULER_INITIAL_DELAY_MS` (all optional, sensible defaults) |
+
+Push notifications currently use a logging stub (`LoggingPushSender`); do not set `push.fcm.enabled` until a real
+`FcmPushSender` is added.
 
 Run the application:
 
@@ -278,7 +303,16 @@ npm install
 ## CI
 
 Pull requests targeting `dev` or `main` run `.github/workflows/ci.yml`, which sets up Temurin Java 25 and runs
-`./gradlew check --no-daemon`.
+`./gradlew check --no-daemon`. The `check` status check is required on the `dev` branch (no review approval required).
+
+### Auto-merge
+
+`.github/workflows/automerge.yml` squash-merges a PR once its CI passes. It runs on `workflow_run` when the `CI`
+workflow completes for a `pull_request`, finds the open PR for that commit, and merges it (with branch delete) only
+when `mergeStateStatus == CLEAN` — a PR that is `BEHIND` dev, has conflicts (`DIRTY`), or is otherwise `BLOCKED` is
+skipped, so a stale green check never merges an out-of-date branch. Only `dev`-targeted, non-draft PRs are eligible;
+`main` release PRs are merged manually so the deploy workflow triggers. The workflow grants itself `contents` and
+`pull-requests` write via its own `permissions:` block and merges with the built-in `GITHUB_TOKEN`.
 
 ## Production Deployment
 
