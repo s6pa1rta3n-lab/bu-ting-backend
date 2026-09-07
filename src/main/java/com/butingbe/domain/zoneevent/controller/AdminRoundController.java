@@ -6,8 +6,10 @@ import com.butingbe.domain.zoneevent.dto.request.RoundCreateReqDto;
 import com.butingbe.domain.zoneevent.dto.request.SlotReassignReqDto;
 import com.butingbe.domain.zoneevent.dto.request.SwapTargetReqDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminRoundResDto;
+import com.butingbe.domain.zoneevent.dto.response.RoundTopNResDto;
 import com.butingbe.domain.zoneevent.dto.response.SlotSuggestionResDto;
 import com.butingbe.domain.zoneevent.service.AdminRoundConsoleService;
+import com.butingbe.domain.zoneevent.service.AdminZoneEventWinnerService;
 import com.butingbe.global.common.ApiResponse;
 import jakarta.validation.Valid;
 import java.time.OffsetDateTime;
@@ -34,6 +36,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminRoundController {
 
   private final AdminRoundConsoleService consoleService;
+  private final AdminZoneEventWinnerService winnerService;
 
   @PostMapping
   public ResponseEntity<ApiResponse<AdminRoundResDto>> create(
@@ -119,5 +122,14 @@ public class AdminRoundController {
       @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID roundId) {
     return ResponseEntity.ok(
         ApiResponse.success("정산 리포트", consoleService.settlementReport(user, roundId)));
+  }
+
+  @GetMapping("/{roundId}/top-n")
+  public ResponseEntity<ApiResponse<RoundTopNResDto>> topN(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID roundId,
+      @RequestParam(required = false) UUID eventId) {
+    return ResponseEntity.ok(
+        ApiResponse.success("Top N 및 경계 동점 후보 조회", winnerService.getTopN(user, roundId, eventId)));
   }
 }

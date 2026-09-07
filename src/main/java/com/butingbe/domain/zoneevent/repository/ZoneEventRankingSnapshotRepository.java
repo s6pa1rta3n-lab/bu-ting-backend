@@ -11,5 +11,9 @@ public interface ZoneEventRankingSnapshotRepository
   List<ZoneEventRankingSnapshot> findByEventIdAndVersionOrderByRankNAsc(
       UUID eventId, Integer version);
 
+  List<ZoneEventRankingSnapshot> findByEventIdOrderByRankNAsc(UUID eventId);
+
+  boolean existsByEventId(UUID eventId);
+
   int countByEventId(UUID eventId);
 }

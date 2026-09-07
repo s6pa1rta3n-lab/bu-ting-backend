@@ -4,9 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.butingbe.domain.reward.dto.response.SettlementReportResDto;
 import com.butingbe.domain.reward.entity.RewardCatalog;
+import com.butingbe.domain.reward.entity.RewardPayout;
 import com.butingbe.domain.reward.entity.RewardType;
 import com.butingbe.domain.reward.repository.RewardCatalogRepository;
 import com.butingbe.domain.reward.repository.RewardGrantRepository;
+import com.butingbe.domain.reward.repository.RewardPayoutRepository;
 import com.butingbe.domain.reward.repository.UserCouponRepository;
 import com.butingbe.domain.user.entity.Name;
 import com.butingbe.domain.user.entity.User;
@@ -18,10 +20,12 @@ import com.butingbe.domain.zoneevent.entity.RewardSnapshot;
 import com.butingbe.domain.zoneevent.entity.RoundStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEvent;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
+import com.butingbe.domain.zoneevent.entity.ZoneEventRankingSnapshot;
 import com.butingbe.domain.zoneevent.entity.ZoneEventRound;
 import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventType;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventRankingSnapshotRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRoundRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
@@ -47,6 +51,8 @@ class RewardSettlementServiceTest extends AbstractContainerTest {
   @Autowired private ZoneEventTypeRepository zoneEventTypeRepository;
   @Autowired private ZoneEventParticipationRepository participationRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private ZoneEventRankingSnapshotRepository snapshotRepository;
+  @Autowired private RewardPayoutRepository rewardPayoutRepository;
 
   private ZoneEventRound round;
   private ZoneEventType type;
@@ -134,6 +140,40 @@ class RewardSettlementServiceTest extends AbstractContainerTest {
 
     assertThat(report.events().get(0).prizes().get(0).status()).isEqualTo("SKIPPED_OUT_OF_STOCK");
     assertThat(empty.getName()).isNotNull();
+  }
+
+  @Test
+  @DisplayName("스냅샷이 확정되었으나 신고로 보류된 수상자는 SKIPPED_HELD_REPORT로 처리된다")
+  void skipsWhenHeldByReportInSnapshot() {
+    ZoneEvent event = savedEvent(1, "COUPON_CAFE");
+    ZoneEventParticipation top = success(event, 10);
+
+    ZoneEventRankingSnapshot snapshot =
+        ZoneEventRankingSnapshot.builder()
+            .eventId(event.getId())
+            .participationId(top.getId())
+            .rankN(1)
+            .likeCountAtClose(10L)
+            .tied(false)
+            .closedAt(OffsetDateTime.now())
+            .build();
+    snapshot.markFinalized();
+    snapshotRepository.save(snapshot);
+
+    RewardPayout payout =
+        RewardPayout.builder()
+            .eventId(event.getId())
+            .participationId(top.getId())
+            .rankN(1)
+            .likeCountAtClose(10L)
+            .reward(new RewardSnapshot(null, null, 1, "COUPON_CAFE"))
+            .build();
+    payout.hold();
+    rewardPayoutRepository.save(payout);
+
+    SettlementReportResDto report = settlementService.settleTopLike(round.getId());
+
+    assertThat(report.events().get(0).prizes().get(0).status()).isEqualTo("SKIPPED_HELD_REPORT");
   }
 
   @Test

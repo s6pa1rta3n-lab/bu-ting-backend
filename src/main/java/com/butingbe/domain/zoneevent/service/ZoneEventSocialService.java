@@ -9,14 +9,18 @@ import com.butingbe.domain.zoneevent.dto.response.CommentResDto;
 import com.butingbe.domain.zoneevent.dto.response.LikeResDto;
 import com.butingbe.domain.zoneevent.dto.response.ReportResDto;
 import com.butingbe.domain.zoneevent.entity.ReportReasonCode;
+import com.butingbe.domain.zoneevent.entity.RoundStatus;
+import com.butingbe.domain.zoneevent.entity.ZoneEvent;
 import com.butingbe.domain.zoneevent.entity.ZoneEventComment;
 import com.butingbe.domain.zoneevent.entity.ZoneEventLike;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventReport;
+import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
 import com.butingbe.domain.zoneevent.repository.ZoneEventCommentRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventLikeRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventReportRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventRoundRepository;
 import com.butingbe.domain.zonetitle.dto.response.EquippedTitleResDto;
 import com.butingbe.domain.zonetitle.service.ZoneTitleService;
 import com.butingbe.global.error.exception.ConflictException;
@@ -59,6 +63,7 @@ public class ZoneEventSocialService {
   private final ZoneEventLikeRepository likeRepository;
   private final ZoneEventCommentRepository commentRepository;
   private final ZoneEventReportRepository reportRepository;
+  private final ZoneEventRoundRepository roundRepository;
   private final UserRepository userRepository;
   private final OperatorAuthorization operatorAuthorization;
   private final ZoneTitleService zoneTitleService;
@@ -70,6 +75,7 @@ public class ZoneEventSocialService {
   public LikeResDto like(AuthenticatedUser user, UUID participationId) {
     UUID userId = requireUserId(user);
     ZoneEventParticipation participation = requireInteractable(participationId);
+    requireRoundActiveForLike(participation);
     if (participation.getUserId().equals(userId)) {
       throw new IllegalArgumentException("error.zone_event.like.self");
     }
@@ -86,14 +92,35 @@ public class ZoneEventSocialService {
   @Transactional
   public void unlike(AuthenticatedUser user, UUID participationId) {
     UUID userId = requireUserId(user);
+    ZoneEventParticipation participation = requireInteractable(participationId);
+    requireRoundActiveForLike(participation);
     ZoneEventLike like =
         likeRepository
             .findByParticipationIdAndUserId(participationId, userId)
             .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.like.duplicate"));
     likeRepository.delete(like);
-    participationRepository
-        .findById(participationId)
-        .ifPresent(ZoneEventParticipation::decreaseLikeCount);
+    participation.decreaseLikeCount();
+  }
+
+  private void requireRoundActiveForLike(ZoneEventParticipation participation) {
+    ZoneEvent event = participation.getEvent();
+    if (event.getStatus() != ZoneEventStatus.ACTIVE) {
+      throw new ConflictException("error.zone_event.round.closed");
+    }
+    if (event.getRoundId() != null) {
+      roundRepository
+          .findById(event.getRoundId())
+          .ifPresent(
+              round -> {
+                if (round.getStatus() == RoundStatus.CLOSED
+                    || round.getStatus() == RoundStatus.SETTLED
+                    || round.getClosedAt() != null
+                    || (round.getEndsAt() != null
+                        && !round.getEndsAt().isAfter(OffsetDateTime.now()))) {
+                  throw new ConflictException("error.zone_event.round.closed");
+                }
+              });
+    }
   }
 
   @Transactional

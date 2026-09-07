@@ -3,6 +3,10 @@ package com.butingbe.domain.zoneevent.service;
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.auth.security.OperatorAuthorization;
 import com.butingbe.domain.reward.dto.response.BaseRewardResult;
+import com.butingbe.domain.reward.entity.BaseRewardPayout;
+import com.butingbe.domain.reward.entity.RewardPayout;
+import com.butingbe.domain.reward.repository.BaseRewardPayoutRepository;
+import com.butingbe.domain.reward.repository.RewardPayoutRepository;
 import com.butingbe.domain.reward.service.RewardRevokeService;
 import com.butingbe.domain.reward.service.RewardService;
 import com.butingbe.domain.zoneevent.dto.response.ParticipationResDto;
@@ -49,6 +53,8 @@ public class AdminReviewService {
 
   private final ZoneEventParticipationRepository participationRepository;
   private final ZoneEventReportRepository reportRepository;
+  private final RewardPayoutRepository rewardPayoutRepository;
+  private final BaseRewardPayoutRepository baseRewardPayoutRepository;
   private final RewardService rewardService;
   private final RewardRevokeService rewardRevokeService;
   private final ZoneTitleService zoneTitleService;
@@ -157,6 +163,12 @@ public class AdminReviewService {
     for (ZoneEventReport report : reportRepository.findByParticipationId(participationId)) {
       report.resolveAs(ReportStatus.DISMISSED);
     }
+    rewardPayoutRepository
+        .findByParticipationId(participationId)
+        .ifPresent(RewardPayout::releaseHold);
+    baseRewardPayoutRepository
+        .findByParticipationId(participationId)
+        .ifPresent(BaseRewardPayout::releaseHold);
   }
 
   private ZoneEventParticipation requireStatus(UUID participationId, ParticipationStatus expected) {

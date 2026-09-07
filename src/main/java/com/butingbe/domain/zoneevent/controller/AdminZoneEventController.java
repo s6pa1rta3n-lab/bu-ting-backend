@@ -3,9 +3,13 @@ package com.butingbe.domain.zoneevent.controller;
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.zoneevent.dto.request.AdminZoneEventCreateReqDto;
 import com.butingbe.domain.zoneevent.dto.request.AdminZoneEventUpdateReqDto;
+import com.butingbe.domain.zoneevent.dto.request.ConfirmWinnersReqDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminZoneEventPageResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminZoneEventResDto;
+import com.butingbe.domain.zoneevent.dto.response.ConfirmWinnersResDto;
+import com.butingbe.domain.zoneevent.dto.response.PayoutGenerateResDto;
 import com.butingbe.domain.zoneevent.service.AdminZoneEventService;
+import com.butingbe.domain.zoneevent.service.AdminZoneEventWinnerService;
 import com.butingbe.global.common.ApiResponse;
 import jakarta.validation.Valid;
 import java.time.OffsetDateTime;
@@ -30,6 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminZoneEventController {
 
   private final AdminZoneEventService adminZoneEventService;
+  private final AdminZoneEventWinnerService winnerService;
 
   @PostMapping
   public ResponseEntity<ApiResponse<AdminZoneEventResDto>> create(
@@ -88,5 +93,21 @@ public class AdminZoneEventController {
       @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID eventId) {
     return ResponseEntity.ok(
         ApiResponse.success("이벤트 취소", adminZoneEventService.cancel(user, eventId)));
+  }
+
+  @PostMapping("/{eventId}/winners/confirm")
+  public ResponseEntity<ApiResponse<ConfirmWinnersResDto>> confirmWinners(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID eventId,
+      @RequestBody @Valid ConfirmWinnersReqDto request) {
+    return ResponseEntity.ok(
+        ApiResponse.success("수상자 확정", winnerService.confirmWinners(user, eventId, request)));
+  }
+
+  @PostMapping("/{eventId}/payouts/generate")
+  public ResponseEntity<ApiResponse<PayoutGenerateResDto>> generatePayouts(
+      @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID eventId) {
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(ApiResponse.success("지급 후보 생성", winnerService.generatePayouts(user, eventId)));
   }
 }

@@ -4,9 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.reward.entity.BaseRewardPayout;
+import com.butingbe.domain.reward.entity.PayoutHoldStatus;
 import com.butingbe.domain.reward.entity.RewardCatalog;
+import com.butingbe.domain.reward.entity.RewardPayout;
 import com.butingbe.domain.reward.entity.RewardType;
+import com.butingbe.domain.reward.repository.BaseRewardPayoutRepository;
 import com.butingbe.domain.reward.repository.RewardCatalogRepository;
+import com.butingbe.domain.reward.repository.RewardPayoutRepository;
 import com.butingbe.domain.reward.service.UserPointService;
 import com.butingbe.domain.user.entity.Name;
 import com.butingbe.domain.user.entity.User;
@@ -53,6 +58,8 @@ class AdminReviewServiceTest extends AbstractContainerTest {
   @Autowired private RewardCatalogRepository rewardCatalogRepository;
   @Autowired private UserPointService userPointService;
   @Autowired private UserRepository userRepository;
+  @Autowired private RewardPayoutRepository rewardPayoutRepository;
+  @Autowired private BaseRewardPayoutRepository baseRewardPayoutRepository;
 
   private ZoneEvent event;
   private AuthenticatedUser operator;
@@ -228,6 +235,42 @@ class AdminReviewServiceTest extends AbstractContainerTest {
         .isInstanceOf(com.butingbe.global.error.exception.ResourceNotFoundException.class);
     assertThatThrownBy(() -> reviewService.unhide(operator, UUID.randomUUID()))
         .isInstanceOf(com.butingbe.global.error.exception.ResourceNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("참여 숨김해제 시 보류된 보상(RewardPayout 및 BaseRewardPayout)의 보류가 해제된다")
+  void unhideReleasesHoldOnPayouts() {
+    ZoneEventParticipation p =
+        participationRepository.save(participation(ParticipationStatus.SUCCESS, true));
+
+    RewardPayout payout =
+        RewardPayout.builder()
+            .eventId(event.getId())
+            .participationId(p.getId())
+            .rankN(1)
+            .likeCountAtClose(10L)
+            .reward(new RewardSnapshot(100, "POINT", null, null))
+            .build();
+    payout.hold();
+    rewardPayoutRepository.save(payout);
+
+    BaseRewardPayout basePayout =
+        BaseRewardPayout.builder()
+            .participationId(p.getId())
+            .reward(new RewardSnapshot(100, "POINT", null, null))
+            .build();
+    basePayout.hold();
+    baseRewardPayoutRepository.save(basePayout);
+
+    reviewService.unhide(operator, p.getId());
+
+    RewardPayout reloadedPayout =
+        rewardPayoutRepository.findByParticipationId(p.getId()).orElseThrow();
+    assertThat(reloadedPayout.getHoldStatus()).isEqualTo(PayoutHoldStatus.NONE);
+
+    BaseRewardPayout reloadedBase =
+        baseRewardPayoutRepository.findByParticipationId(p.getId()).orElseThrow();
+    assertThat(reloadedBase.getHoldStatus()).isEqualTo(PayoutHoldStatus.NONE);
   }
 
   private ZoneEventParticipation participation(ParticipationStatus status, boolean hidden) {

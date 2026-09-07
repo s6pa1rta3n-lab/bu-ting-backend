@@ -42,6 +42,9 @@ class ZoneEventSocialServiceTest extends AbstractContainerTest {
   @Autowired private ZoneEventParticipationRepository participationRepository;
   @Autowired private UserRepository userRepository;
 
+  @Autowired
+  private com.butingbe.domain.zoneevent.repository.ZoneEventRoundRepository roundRepository;
+
   private ZoneEvent event;
   private UUID authorId;
   private AuthenticatedUser viewer;
@@ -224,6 +227,229 @@ class ZoneEventSocialServiceTest extends AbstractContainerTest {
         .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> socialService.like(null, participationId))
         .isInstanceOf(com.butingbe.global.error.exception.UnauthenticatedException.class);
+  }
+
+  @Test
+  @DisplayName("회차 또는 이벤트가 종료되면 좋아요 생성 및 취소가 차단된다")
+  void likeAndUnlikeBlockedWhenRoundOrEventClosed() {
+    com.butingbe.domain.zoneevent.entity.ZoneEventRound closedRound =
+        roundRepository.save(
+            com.butingbe.domain.zoneevent.entity.ZoneEventRound.builder()
+                .roundNo(99)
+                .roundType(com.butingbe.domain.zoneevent.entity.RoundType.REGULAR)
+                .startsAt(java.time.OffsetDateTime.now().minusDays(2))
+                .endsAt(java.time.OffsetDateTime.now().minusDays(1))
+                .timezone("Asia/Seoul")
+                .status(com.butingbe.domain.zoneevent.entity.RoundStatus.CLOSED)
+                .build());
+
+    ZoneEvent roundEvent =
+        zoneEventRepository.save(
+            ZoneEvent.builder()
+                .zoneId("SUYEONG_NAMGU")
+                .type(zoneEventTypeRepository.findAll().get(0))
+                .roundId(closedRound.getId())
+                .title("회차 이벤트")
+                .startsAt(closedRound.getStartsAt())
+                .durationMinutes(60)
+                .status(ZoneEventStatus.ACTIVE)
+                .baseReward(new RewardSnapshot(100, "POINT", null, null))
+                .build());
+
+    ZoneEventParticipation p =
+        participationRepository.save(
+            ZoneEventParticipation.builder()
+                .event(roundEvent)
+                .userId(authorId)
+                .status(ParticipationStatus.SUCCESS)
+                .gpsLat(35.1)
+                .gpsLng(129.1)
+                .joinedAt(java.time.OffsetDateTime.now())
+                .visibility(ParticipationVisibility.PUBLIC)
+                .build());
+    p.submit("m.jpg", "후기", 35.1, 129.1, java.time.OffsetDateTime.now());
+    p.markSuccess();
+    p = participationRepository.save(p);
+
+    UUID pId = p.getId();
+    assertThatThrownBy(() -> socialService.like(viewer, pId)).isInstanceOf(ConflictException.class);
+    assertThatThrownBy(() -> socialService.unlike(viewer, pId))
+        .isInstanceOf(ConflictException.class);
+
+    event.close();
+    zoneEventRepository.save(event);
+    UUID openPId = publicSuccess().getId();
+    assertThatThrownBy(() -> socialService.like(viewer, openPId))
+        .isInstanceOf(ConflictException.class);
+    assertThatThrownBy(() -> socialService.unlike(viewer, openPId))
+        .isInstanceOf(ConflictException.class);
+
+    com.butingbe.domain.zoneevent.entity.ZoneEventRound settledRound =
+        roundRepository.save(
+            com.butingbe.domain.zoneevent.entity.ZoneEventRound.builder()
+                .roundNo(100)
+                .roundType(com.butingbe.domain.zoneevent.entity.RoundType.REGULAR)
+                .startsAt(java.time.OffsetDateTime.now().minusDays(2))
+                .endsAt(java.time.OffsetDateTime.now().plusDays(1))
+                .timezone("Asia/Seoul")
+                .status(com.butingbe.domain.zoneevent.entity.RoundStatus.SETTLED)
+                .build());
+    ZoneEvent settledEvent =
+        zoneEventRepository.save(
+            ZoneEvent.builder()
+                .zoneId("SUYEONG_NAMGU")
+                .type(zoneEventTypeRepository.findAll().get(0))
+                .roundId(settledRound.getId())
+                .title("정산된 회차")
+                .startsAt(settledRound.getStartsAt())
+                .durationMinutes(60)
+                .status(ZoneEventStatus.ACTIVE)
+                .baseReward(new RewardSnapshot(50, null, null, null))
+                .build());
+    ZoneEventParticipation settledP =
+        participationRepository.save(
+            ZoneEventParticipation.builder()
+                .event(settledEvent)
+                .userId(authorId)
+                .status(ParticipationStatus.SUCCESS)
+                .gpsLat(35.1)
+                .gpsLng(129.1)
+                .joinedAt(java.time.OffsetDateTime.now())
+                .visibility(ParticipationVisibility.PUBLIC)
+                .build());
+    settledP.submit("s.jpg", "후기", 35.1, 129.1, java.time.OffsetDateTime.now());
+    settledP.markSuccess();
+    settledP = participationRepository.save(settledP);
+    UUID settledPId = settledP.getId();
+    assertThatThrownBy(() -> socialService.like(viewer, settledPId))
+        .isInstanceOf(ConflictException.class);
+
+    com.butingbe.domain.zoneevent.entity.ZoneEventRound closedAtRound =
+        roundRepository.save(
+            com.butingbe.domain.zoneevent.entity.ZoneEventRound.builder()
+                .roundNo(101)
+                .roundType(com.butingbe.domain.zoneevent.entity.RoundType.REGULAR)
+                .startsAt(java.time.OffsetDateTime.now().minusDays(2))
+                .endsAt(java.time.OffsetDateTime.now().plusDays(1))
+                .timezone("Asia/Seoul")
+                .status(com.butingbe.domain.zoneevent.entity.RoundStatus.OPEN)
+                .build());
+    org.springframework.test.util.ReflectionTestUtils.setField(
+        closedAtRound, "closedAt", java.time.OffsetDateTime.now().minusHours(1));
+    roundRepository.save(closedAtRound);
+    ZoneEvent closedAtEvent =
+        zoneEventRepository.save(
+            ZoneEvent.builder()
+                .zoneId("SUYEONG_NAMGU")
+                .type(zoneEventTypeRepository.findAll().get(0))
+                .roundId(closedAtRound.getId())
+                .title("종료일시 회차")
+                .startsAt(closedAtRound.getStartsAt())
+                .durationMinutes(60)
+                .status(ZoneEventStatus.ACTIVE)
+                .baseReward(new RewardSnapshot(50, null, null, null))
+                .build());
+    ZoneEventParticipation closedAtP =
+        participationRepository.save(
+            ZoneEventParticipation.builder()
+                .event(closedAtEvent)
+                .userId(authorId)
+                .status(ParticipationStatus.SUCCESS)
+                .gpsLat(35.1)
+                .gpsLng(129.1)
+                .joinedAt(java.time.OffsetDateTime.now())
+                .visibility(ParticipationVisibility.PUBLIC)
+                .build());
+    closedAtP.submit("c.jpg", "후기", 35.1, 129.1, java.time.OffsetDateTime.now());
+    closedAtP.markSuccess();
+    closedAtP = participationRepository.save(closedAtP);
+    UUID closedAtPId = closedAtP.getId();
+    assertThatThrownBy(() -> socialService.like(viewer, closedAtPId))
+        .isInstanceOf(ConflictException.class);
+
+    com.butingbe.domain.zoneevent.entity.ZoneEventRound expiredRound =
+        roundRepository.save(
+            com.butingbe.domain.zoneevent.entity.ZoneEventRound.builder()
+                .roundNo(102)
+                .roundType(com.butingbe.domain.zoneevent.entity.RoundType.REGULAR)
+                .startsAt(java.time.OffsetDateTime.now().minusDays(2))
+                .endsAt(java.time.OffsetDateTime.now().minusMinutes(5))
+                .timezone("Asia/Seoul")
+                .status(com.butingbe.domain.zoneevent.entity.RoundStatus.OPEN)
+                .build());
+    ZoneEvent expiredEvent =
+        zoneEventRepository.save(
+            ZoneEvent.builder()
+                .zoneId("SUYEONG_NAMGU")
+                .type(zoneEventTypeRepository.findAll().get(0))
+                .roundId(expiredRound.getId())
+                .title("기간만료 회차")
+                .startsAt(expiredRound.getStartsAt())
+                .durationMinutes(60)
+                .status(ZoneEventStatus.ACTIVE)
+                .baseReward(new RewardSnapshot(50, null, null, null))
+                .build());
+    ZoneEventParticipation expiredP =
+        participationRepository.save(
+            ZoneEventParticipation.builder()
+                .event(expiredEvent)
+                .userId(authorId)
+                .status(ParticipationStatus.SUCCESS)
+                .gpsLat(35.1)
+                .gpsLng(129.1)
+                .joinedAt(java.time.OffsetDateTime.now())
+                .visibility(ParticipationVisibility.PUBLIC)
+                .build());
+    expiredP.submit("e.jpg", "후기", 35.1, 129.1, java.time.OffsetDateTime.now());
+    expiredP.markSuccess();
+    expiredP = participationRepository.save(expiredP);
+    UUID expiredPId = expiredP.getId();
+    assertThatThrownBy(() -> socialService.like(viewer, expiredPId))
+        .isInstanceOf(ConflictException.class);
+
+    com.butingbe.domain.zoneevent.entity.ZoneEventRound activeRound =
+        roundRepository.save(
+            com.butingbe.domain.zoneevent.entity.ZoneEventRound.builder()
+                .roundNo(103)
+                .roundType(com.butingbe.domain.zoneevent.entity.RoundType.REGULAR)
+                .startsAt(java.time.OffsetDateTime.now().minusDays(1))
+                .endsAt(java.time.OffsetDateTime.now().plusDays(2))
+                .timezone("Asia/Seoul")
+                .status(com.butingbe.domain.zoneevent.entity.RoundStatus.OPEN)
+                .build());
+    ZoneEvent activeRoundEvent =
+        zoneEventRepository.save(
+            ZoneEvent.builder()
+                .zoneId("SUYEONG_NAMGU")
+                .type(zoneEventTypeRepository.findAll().get(0))
+                .roundId(activeRound.getId())
+                .title("진행중 회차")
+                .startsAt(activeRound.getStartsAt())
+                .durationMinutes(60)
+                .status(ZoneEventStatus.ACTIVE)
+                .baseReward(new RewardSnapshot(50, null, null, null))
+                .build());
+    ZoneEventParticipation activeP =
+        participationRepository.save(
+            ZoneEventParticipation.builder()
+                .event(activeRoundEvent)
+                .userId(authorId)
+                .status(ParticipationStatus.SUCCESS)
+                .gpsLat(35.1)
+                .gpsLng(129.1)
+                .joinedAt(java.time.OffsetDateTime.now())
+                .visibility(ParticipationVisibility.PUBLIC)
+                .build());
+    activeP.submit("a.jpg", "후기", 35.1, 129.1, java.time.OffsetDateTime.now());
+    activeP.markSuccess();
+    activeP = participationRepository.save(activeP);
+
+    socialService.like(viewer, activeP.getId());
+    assertThat(participationRepository.findById(activeP.getId()).orElseThrow().getLikeCount())
+        .isEqualTo(1L);
+    socialService.unlike(viewer, activeP.getId());
+    assertThat(participationRepository.findById(activeP.getId()).orElseThrow().getLikeCount())
+        .isEqualTo(0L);
   }
 
   private ZoneEventParticipation publicSuccess() {

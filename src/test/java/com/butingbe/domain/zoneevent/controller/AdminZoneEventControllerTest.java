@@ -10,7 +10,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.zoneevent.dto.response.AdminZoneEventResDto;
+import com.butingbe.domain.zoneevent.dto.response.ConfirmWinnersResDto;
+import com.butingbe.domain.zoneevent.dto.response.PayoutGenerateResDto;
 import com.butingbe.domain.zoneevent.service.AdminZoneEventService;
+import com.butingbe.domain.zoneevent.service.AdminZoneEventWinnerService;
 import com.butingbe.global.error.GlobalExceptionHandler;
 import com.butingbe.global.error.exception.ForbiddenException;
 import java.time.OffsetDateTime;
@@ -26,6 +29,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.support.StaticMessageSource;
 import org.springframework.core.MethodParameter;
+import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.test.web.servlet.MockMvc;
@@ -44,6 +48,7 @@ class AdminZoneEventControllerTest {
   private static final UUID USER_ID = UUID.fromString("22222222-0000-0000-0000-000000000001");
 
   @Mock private AdminZoneEventService adminZoneEventService;
+  @Mock private AdminZoneEventWinnerService winnerService;
   @InjectMocks private AdminZoneEventController controller;
 
   private MockMvc mockMvc;
@@ -175,6 +180,34 @@ class AdminZoneEventControllerTest {
         .perform(post("/admin/zone-events/{eventId}/cancel", EVENT_ID))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.status").value("CANCELLED"));
+  }
+
+  @Test
+  @DisplayName("수상자 확정 200 OK")
+  void confirmWinners() throws Exception {
+    when(winnerService.confirmWinners(any(), eq(EVENT_ID), any()))
+        .thenReturn(new ConfirmWinnersResDto(EVENT_ID, 1, List.of(), "사유", 0L));
+    mockMvc
+        .perform(
+            post("/admin/zone-events/{eventId}/winners/confirm", EVENT_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"snapshotId\":\""
+                        + UUID.randomUUID()
+                        + "\",\"participationIds\":[],\"selectionReason\":\"공정한 선정\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true));
+  }
+
+  @Test
+  @DisplayName("지급 후보 생성 201 CREATED")
+  void generatePayouts() throws Exception {
+    when(winnerService.generatePayouts(any(), eq(EVENT_ID)))
+        .thenReturn(new PayoutGenerateResDto(EVENT_ID, 1, 0, List.of()));
+    mockMvc
+        .perform(post("/admin/zone-events/{eventId}/payouts/generate", EVENT_ID))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.success").value(true));
   }
 
   private AdminZoneEventResDto detail(String status) {

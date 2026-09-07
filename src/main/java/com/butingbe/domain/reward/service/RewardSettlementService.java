@@ -4,16 +4,21 @@ import com.butingbe.domain.reward.dto.response.SettlementReportResDto;
 import com.butingbe.domain.reward.dto.response.SettlementReportResDto.EventPrizes;
 import com.butingbe.domain.reward.dto.response.SettlementReportResDto.Prize;
 import com.butingbe.domain.reward.entity.GrantReason;
+import com.butingbe.domain.reward.entity.PayoutHoldStatus;
 import com.butingbe.domain.reward.entity.RewardCatalog;
 import com.butingbe.domain.reward.entity.RewardGrant;
+import com.butingbe.domain.reward.entity.RewardPayout;
 import com.butingbe.domain.reward.entity.UserCoupon;
 import com.butingbe.domain.reward.repository.RewardCatalogRepository;
 import com.butingbe.domain.reward.repository.RewardGrantRepository;
+import com.butingbe.domain.reward.repository.RewardPayoutRepository;
 import com.butingbe.domain.reward.repository.UserCouponRepository;
 import com.butingbe.domain.zoneevent.entity.RewardSnapshot;
 import com.butingbe.domain.zoneevent.entity.ZoneEvent;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
+import com.butingbe.domain.zoneevent.entity.ZoneEventRankingSnapshot;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventRankingSnapshotRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRoundRepository;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
@@ -22,6 +27,7 @@ import java.time.ZoneId;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -42,6 +48,7 @@ public class RewardSettlementService {
   private static final String STATUS_OUT_OF_STOCK = "SKIPPED_OUT_OF_STOCK";
   private static final String STATUS_MONTHLY_CAP = "SKIPPED_MONTHLY_CAP";
   private static final String STATUS_ALREADY = "ALREADY_GRANTED";
+  private static final String STATUS_HELD_REPORT = "SKIPPED_HELD_REPORT";
 
   private final ZoneEventRoundRepository roundRepository;
   private final ZoneEventRepository zoneEventRepository;
@@ -49,6 +56,8 @@ public class RewardSettlementService {
   private final RewardCatalogRepository rewardCatalogRepository;
   private final RewardGrantRepository rewardGrantRepository;
   private final UserCouponRepository userCouponRepository;
+  private final ZoneEventRankingSnapshotRepository snapshotRepository;
+  private final RewardPayoutRepository rewardPayoutRepository;
 
   @Transactional
   public SettlementReportResDto settleTopLike(UUID roundId) {
@@ -64,10 +73,30 @@ public class RewardSettlementService {
         continue;
       }
       List<Prize> prizes = new ArrayList<>();
-      List<ZoneEventParticipation> winners =
-          participationRepository.findTopPublicSuccessByEvent(
-              event.getId(), PageRequest.of(0, excellence.topN()));
+      List<ZoneEventParticipation> winners;
+      List<ZoneEventRankingSnapshot> snapshots =
+          snapshotRepository.findByEventIdAndVersionOrderByRankNAsc(event.getId(), 1);
+      if (!snapshots.isEmpty()) {
+        List<UUID> finalizedIds =
+            snapshots.stream()
+                .filter(ZoneEventRankingSnapshot::getFinalized)
+                .map(ZoneEventRankingSnapshot::getParticipationId)
+                .toList();
+        winners = participationRepository.findAllById(finalizedIds);
+      } else {
+        winners =
+            participationRepository.findTopPublicSuccessByEvent(
+                event.getId(), PageRequest.of(0, excellence.topN()));
+      }
       for (ZoneEventParticipation winner : winners) {
+        Optional<RewardPayout> payoutOpt =
+            rewardPayoutRepository.findByParticipationId(winner.getId());
+        if (payoutOpt.isPresent()
+            && payoutOpt.get().getHoldStatus() == PayoutHoldStatus.HELD_REPORT) {
+          prizes.add(
+              prize(winner.getUserId(), winner.getId(), prize.getCode(), STATUS_HELD_REPORT));
+          continue;
+        }
         prizes.add(grantPrize(winner, event.getId(), prize));
       }
       eventPrizes.add(new EventPrizes(event.getId().toString(), prizes));

@@ -32,7 +32,6 @@ class BaseRewardPayoutTest {
   void releaseHoldMarksNone() {
     BaseRewardPayout payout = BaseRewardPayout.builder().participationId(UUID.randomUUID()).build();
     payout.hold();
-
     payout.releaseHold();
 
     assertThat(payout.getHoldStatus()).isEqualTo(PayoutHoldStatus.NONE);
